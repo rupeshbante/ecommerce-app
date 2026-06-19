@@ -1,0 +1,28 @@
+# ===== .NET Backend =====
+ecommerce/backend/bin/
+ecommerce/backend/obj/
+ecommerce/backend/wwwroot/images/products/
+*.user
+*.suo
+.vs/
+ecommerce/backend/appsettings.Development.json
+
+# ===== Keep frontend build in wwwroot (for Railway deployment) =====
+# wwwroot files ARE committed so Railway can serve them
+
+# ===== Angular Frontend =====
+ecommerce/frontend/node_modules/
+ecommerce/frontend/dist/
+ecommerce/frontend/.angular/
+ecommerce/frontend/.sass-cache/
+
+# ===== General =====
+.env
+.env.local
+*.log
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ===== Root node_modules =====
+node_modules/

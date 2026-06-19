@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.git
+**/bin
+**/obj
+**/*.user
+**/.vs
+**/.angular
+**/TestResults
+ecommerce/frontend/.angular
