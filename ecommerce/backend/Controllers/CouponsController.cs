@@ -11,8 +11,12 @@ public class CouponsController(ICouponService couponService) : ControllerBase
 {
     [HttpGet]
     [Authorize(Roles = "Admin,Manager")]
-    public async Task<ActionResult<List<CouponDto>>> GetAll() =>
-        Ok(await couponService.GetAllAsync());
+    public async Task<ActionResult<PagedResultDto<CouponDto>>> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        var all = await couponService.GetAllAsync();
+        var items = all.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return Ok(new PagedResultDto<CouponDto>(all.Count, page, pageSize, items));
+    }
 
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin,Manager")]

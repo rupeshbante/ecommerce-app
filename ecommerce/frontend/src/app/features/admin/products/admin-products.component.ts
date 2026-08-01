@@ -14,7 +14,7 @@ import { Product } from '../../../core/models/product.models';
       <div class="page-head">
         <div>
           <h1>Products</h1>
-          <p>Manage your product catalog ({{ filtered.length }} products)</p>
+          <p>Manage your product catalog ({{ total }} products)</p>
         </div>
         <div class="head-actions">
           <button class="btn-outline" (click)="downloadTemplate()">⬇️ CSV Template</button>
@@ -28,12 +28,12 @@ import { Product } from '../../../core/models/product.models';
 
       <!-- Filters -->
       <div class="filters-bar">
-        <input [(ngModel)]="search" (ngModelChange)="applyFilter()" placeholder="🔍 Search products..." class="search-input">
-        <select [(ngModel)]="catFilter" (ngModelChange)="applyFilter()" class="sel">
+        <input [(ngModel)]="search" (ngModelChange)="onFilterChange()" placeholder="🔍 Search products..." class="search-input">
+        <select [(ngModel)]="catFilter" (ngModelChange)="onFilterChange()" class="sel">
           <option value="">All Categories</option>
           <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
         </select>
-        <select [(ngModel)]="statusFilter" (ngModelChange)="applyFilter()" class="sel">
+        <select [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()" class="sel">
           <option value="">All Status</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
@@ -52,7 +52,7 @@ import { Product } from '../../../core/models/product.models';
             </thead>
             <tbody>
               <tr *ngIf="loading"><td colspan="8" class="loading-row">Loading products...</td></tr>
-              <tr *ngFor="let p of filtered">
+              <tr *ngFor="let p of products">
                 <td><strong>#{{ p.id }}</strong></td>
                 <td><img [src]="p.imageUrl" [alt]="p.name" class="prod-thumb" (error)="$any($event.target).src='https://placehold.co/50x50?text=?'"></td>
                 <td>
@@ -72,6 +72,7 @@ import { Product } from '../../../core/models/product.models';
                 <td>
                   <div class="actions">
                     <button class="btn-icon edit" (click)="openEdit(p)" title="Edit">✏️</button>
+                    <button class="btn-icon media" (click)="openMedia(p)" title="Images & Variants">🖼️</button>
                     <button class="btn-icon toggle" (click)="toggleStatus(p)" [title]="p.isActive ? 'Deactivate' : 'Activate'">
                       {{ p.isActive ? '🔴' : '🟢' }}
                     </button>
@@ -79,11 +80,16 @@ import { Product } from '../../../core/models/product.models';
                   </div>
                 </td>
               </tr>
-              <tr *ngIf="!loading && filtered.length === 0">
+              <tr *ngIf="!loading && products.length === 0">
                 <td colspan="8" class="empty-row">No products found</td>
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="pagination" *ngIf="total > pageSize">
+          <button [disabled]="page === 1" (click)="changePage(page - 1)">Previous</button>
+          <span>Page {{ page }} of {{ Math.ceil(total / pageSize) }}</span>
+          <button [disabled]="page >= Math.ceil(total / pageSize)" (click)="changePage(page + 1)">Next</button>
         </div>
       </div>
     </div>
@@ -163,6 +169,67 @@ import { Product } from '../../../core/models/product.models';
         </div>
       </div>
     </div>
+
+    <!-- Images & Variants Modal -->
+    <div class="modal-overlay" *ngIf="mediaProduct" (click)="closeMedia()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-head">
+          <h2>{{ mediaProduct.name }} — Images &amp; Variants</h2>
+          <button class="close-btn" (click)="closeMedia()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="media-section">
+            <h4>Gallery Images</h4>
+            <div class="gallery-grid" *ngIf="mediaImages.length">
+              <div class="gallery-item" *ngFor="let img of mediaImages">
+                <img [src]="img.url" (error)="$any($event.target).src='https://placehold.co/100x100?text=?'">
+                <span *ngIf="img.isPrimary" class="primary-tag">Primary</span>
+                <button class="gallery-del" (click)="removeImage(img)" title="Remove">✕</button>
+              </div>
+            </div>
+            <p class="empty-hint" *ngIf="!mediaImages.length">No extra gallery images yet — main image is set from the product form.</p>
+            <div class="add-row">
+              <input [(ngModel)]="newImage.url" placeholder="Image URL" class="flex-input">
+              <label class="chk"><input type="checkbox" [(ngModel)]="newImage.isPrimary"> Primary</label>
+              <button class="btn-outline" (click)="addImage()" [disabled]="!newImage.url">+ Add</button>
+            </div>
+          </div>
+
+          <div class="media-section">
+            <h4>Variants (size / color etc.)</h4>
+            <table class="variant-table" *ngIf="mediaVariants.length">
+              <thead><tr><th>Name</th><th>Value</th><th>Price Δ</th><th>Stock</th><th>SKU</th><th>Active</th><th></th></tr></thead>
+              <tbody>
+                <tr *ngFor="let v of mediaVariants">
+                  <td><input [(ngModel)]="v.name" class="cell-input"></td>
+                  <td><input [(ngModel)]="v.value" class="cell-input"></td>
+                  <td><input type="number" [(ngModel)]="v.priceModifier" class="cell-input narrow"></td>
+                  <td><input type="number" [(ngModel)]="v.stock" class="cell-input narrow"></td>
+                  <td><input [(ngModel)]="v.sku" class="cell-input"></td>
+                  <td><input type="checkbox" [(ngModel)]="v.isActive"></td>
+                  <td class="variant-actions">
+                    <button class="btn-icon" (click)="saveVariant(v)" title="Save">💾</button>
+                    <button class="btn-icon del" (click)="removeVariant(v)" title="Delete">🗑️</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="empty-hint" *ngIf="!mediaVariants.length">No variants yet.</p>
+            <div class="add-row">
+              <input [(ngModel)]="newVariant.name" placeholder="Name (e.g. Size)" class="flex-input">
+              <input [(ngModel)]="newVariant.value" placeholder="Value (e.g. XL)" class="flex-input">
+              <input type="number" [(ngModel)]="newVariant.priceModifier" placeholder="Price Δ" class="flex-input narrow">
+              <input type="number" [(ngModel)]="newVariant.stock" placeholder="Stock" class="flex-input narrow">
+              <input [(ngModel)]="newVariant.sku" placeholder="SKU" class="flex-input">
+              <button class="btn-outline" (click)="addVariant()" [disabled]="!newVariant.name || !newVariant.value">+ Add</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn-cancel" (click)="closeMedia()">Close</button>
+        </div>
+      </div>
+    </div>
   `,
   styles: [`
     :host { display: block; }
@@ -236,16 +303,48 @@ import { Product } from '../../../core/models/product.models';
     .btn-save { background: #6c63ff; color: #fff; border: none; border-radius: 10px; padding: 0.65rem 1.5rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.18s; }
     .btn-save:hover:not(:disabled) { background: #5a52d5; }
     .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; padding: 1rem; font-size: 0.875rem; color: #555; border-top: 1px solid #f5f5f5; }
+    .pagination button { background: #6c63ff; color: #fff; border: none; border-radius: 8px; padding: 0.4rem 1rem; cursor: pointer; font-size: 0.82rem; }
+    .pagination button:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* Media modal */
+    .media-section { border-bottom: 1px solid #f0f0f0; padding-bottom: 1.25rem; margin-bottom: 0.25rem; }
+    .media-section:last-child { border-bottom: none; }
+    .media-section h4 { font-size: 0.85rem; font-weight: 700; color: #1e2a38; margin-bottom: 0.75rem; }
+    .empty-hint { font-size: 0.8rem; color: #aaa; margin-bottom: 0.75rem; }
+    .gallery-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .gallery-item { position: relative; width: 80px; height: 80px; border-radius: 10px; overflow: hidden; border: 1px solid #eee; }
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
+    .primary-tag { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(108,99,255,0.85); color: #fff; font-size: 0.6rem; font-weight: 700; text-align: center; padding: 0.1rem 0; }
+    .gallery-del { position: absolute; top: 0.2rem; right: 0.2rem; background: rgba(0,0,0,0.55); color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 0.65rem; cursor: pointer; }
+    .add-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .flex-input { flex: 1; min-width: 120px; padding: 0.55rem 0.75rem; border: 1.5px solid #e9ecef; border-radius: 8px; font-size: 0.82rem; outline: none; }
+    .flex-input.narrow { flex: 0 0 90px; }
+    .chk { display: flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; color: #555; white-space: nowrap; }
+    .variant-table { width: 100%; border-collapse: collapse; margin-bottom: 0.75rem; }
+    .variant-table th { text-align: left; font-size: 0.68rem; font-weight: 700; color: #888; text-transform: uppercase; padding: 0.4rem 0.5rem; }
+    .variant-table td { padding: 0.3rem 0.5rem; }
+    .cell-input { width: 100%; padding: 0.4rem 0.5rem; border: 1.5px solid #e9ecef; border-radius: 6px; font-size: 0.8rem; outline: none; }
+    .cell-input.narrow { width: 65px; }
+    .variant-actions { display: flex; gap: 0.25rem; white-space: nowrap; }
   `]
 })
 export class AdminProductsComponent implements OnInit {
   products: Product[] = [];
-  filtered: Product[] = [];
   loading = true; saving = false; uploading = false;
   showModal = false; editing = false;
   search = ''; catFilter = ''; statusFilter = '';
+  page = 1; pageSize = 20; total = 0;
+  Math = Math;
+  private searchDebounce: any;
   categories = ['Electronics', 'Clothing', 'Books', 'Home', 'Footwear', 'Sports', 'Beauty', 'Toys'];
   form: any = this.emptyForm();
+
+  mediaProduct: Product | null = null;
+  mediaImages: any[] = [];
+  mediaVariants: any[] = [];
+  newImage = { url: '', isPrimary: false };
+  newVariant = { name: '', value: '', priceModifier: 0, stock: 0, sku: '' };
 
   constructor(private adminService: AdminService, private toasts: ToastService) {}
 
@@ -255,19 +354,17 @@ export class AdminProductsComponent implements OnInit {
 
   loadProducts() {
     this.loading = true;
-    this.adminService.getAllProducts().subscribe({
-      next: p => { this.products = p; this.applyFilter(); this.loading = false; },
+    const isActive = this.statusFilter ? this.statusFilter === 'active' : undefined;
+    this.adminService.getAdminProducts(this.page, this.pageSize, this.search || undefined, this.catFilter || undefined, isActive).subscribe({
+      next: res => { this.products = res.data; this.total = res.total; this.loading = false; },
       error: () => this.loading = false
     });
   }
 
-  applyFilter() {
-    this.filtered = this.products.filter(p => {
-      const matchSearch = !this.search || p.name.toLowerCase().includes(this.search.toLowerCase());
-      const matchCat = !this.catFilter || p.category === this.catFilter;
-      const matchStatus = !this.statusFilter || (this.statusFilter === 'active' ? p.isActive : !p.isActive);
-      return matchSearch && matchCat && matchStatus;
-    });
+  changePage(p: number) { this.page = p; this.loadProducts(); }
+  onFilterChange() {
+    clearTimeout(this.searchDebounce);
+    this.searchDebounce = setTimeout(() => { this.page = 1; this.loadProducts(); }, 350);
   }
 
   emptyForm() {
@@ -341,6 +438,66 @@ export class AdminProductsComponent implements OnInit {
     this.adminService.uploadImage(file).subscribe({
       next: res => { this.form.imageUrl = res.url; this.uploading = false; this.toasts.success('Image uploaded!'); },
       error: () => { this.toasts.error('Upload failed.'); this.uploading = false; }
+    });
+  }
+
+  openMedia(p: Product) {
+    this.mediaProduct = p;
+    this.newImage = { url: '', isPrimary: false };
+    this.newVariant = { name: '', value: '', priceModifier: 0, stock: 0, sku: '' };
+    this.adminService.getProductImages(p.id).subscribe(imgs => this.mediaImages = imgs);
+    this.adminService.getProductVariants(p.id).subscribe(vars => this.mediaVariants = vars);
+  }
+
+  closeMedia() { this.mediaProduct = null; this.mediaImages = []; this.mediaVariants = []; }
+
+  addImage() {
+    if (!this.mediaProduct || !this.newImage.url) return;
+    this.adminService.addProductImage(this.mediaProduct.id, { url: this.newImage.url, isPrimary: this.newImage.isPrimary, sortOrder: this.mediaImages.length }).subscribe({
+      next: img => {
+        if (img.isPrimary) this.mediaImages.forEach(i => i.isPrimary = false);
+        this.mediaImages.push(img);
+        this.newImage = { url: '', isPrimary: false };
+        this.toasts.success('Image added.');
+      },
+      error: () => this.toasts.error('Failed to add image.')
+    });
+  }
+
+  removeImage(img: any) {
+    if (!this.mediaProduct) return;
+    this.adminService.deleteProductImage(this.mediaProduct.id, img.id).subscribe({
+      next: () => { this.mediaImages = this.mediaImages.filter(i => i.id !== img.id); },
+      error: () => this.toasts.error('Failed to remove image.')
+    });
+  }
+
+  addVariant() {
+    if (!this.mediaProduct || !this.newVariant.name || !this.newVariant.value) return;
+    this.adminService.addProductVariant(this.mediaProduct.id, this.newVariant).subscribe({
+      next: v => {
+        this.mediaVariants.push(v);
+        this.newVariant = { name: '', value: '', priceModifier: 0, stock: 0, sku: '' };
+        this.toasts.success('Variant added.');
+      },
+      error: () => this.toasts.error('Failed to add variant.')
+    });
+  }
+
+  saveVariant(v: any) {
+    if (!this.mediaProduct) return;
+    this.adminService.updateProductVariant(this.mediaProduct.id, v.id, v).subscribe({
+      next: () => this.toasts.success('Variant saved.'),
+      error: () => this.toasts.error('Failed to save variant.')
+    });
+  }
+
+  removeVariant(v: any) {
+    if (!this.mediaProduct) return;
+    if (!confirm(`Delete variant "${v.name}: ${v.value}"?`)) return;
+    this.adminService.deleteProductVariant(this.mediaProduct.id, v.id).subscribe({
+      next: () => { this.mediaVariants = this.mediaVariants.filter(x => x.id !== v.id); this.toasts.success('Variant deleted.'); },
+      error: () => this.toasts.error('Failed to delete variant.')
     });
   }
 }

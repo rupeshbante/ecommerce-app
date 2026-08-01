@@ -16,7 +16,7 @@ import { ToastService } from '../../../core/services/toast.service';
     <div class="container">
       <!-- Filter -->
       <div class="filter-row">
-        <select [(ngModel)]="filterStatus" (change)="loadReturns()">
+        <select [(ngModel)]="filterStatus" (change)="page = 1; loadReturns()">
           <option value="">All Status</option>
           <option value="Pending">Pending</option>
           <option value="Approved">Approved</option>
@@ -57,6 +57,11 @@ import { ToastService } from '../../../core/services/toast.service';
             </tr>
           </tbody>
         </table>
+        <div class="pagination" *ngIf="total > pageSize">
+          <button [disabled]="page === 1" (click)="changePage(page - 1)">Previous</button>
+          <span>Page {{ page }} of {{ Math.ceil(total / pageSize) }}</span>
+          <button [disabled]="page >= Math.ceil(total / pageSize)" (click)="changePage(page + 1)">Next</button>
+        </div>
       </div>
     </div>
   `,
@@ -82,12 +87,17 @@ import { ToastService } from '../../../core/services/toast.service';
     .btn-reject { background: #fce4ec; color: #c62828; }
     .btn-complete { background: #e3f2fd; color: #1565c0; }
     .no-data { text-align: center; color: #aaa; padding: 2rem; }
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; padding: 1rem; font-size: 0.875rem; color: #555; border-top: 1px solid #f5f5f5; }
+    .pagination button { background: #6c63ff; color: #fff; border: none; border-radius: 8px; padding: 0.4rem 1rem; cursor: pointer; font-size: 0.82rem; }
+    .pagination button:disabled { background: #ccc; cursor: not-allowed; }
   `]
 })
 export class AdminReturnsComponent implements OnInit {
   returns: any[] = [];
   loading = true;
   filterStatus = '';
+  page = 1; pageSize = 20; total = 0;
+  Math = Math;
 
   constructor(private adminService: AdminService, private toasts: ToastService) {}
 
@@ -95,11 +105,13 @@ export class AdminReturnsComponent implements OnInit {
 
   loadReturns() {
     this.loading = true;
-    this.adminService.getReturns(this.filterStatus).subscribe({
-      next: r => { this.returns = r; this.loading = false; },
+    this.adminService.getReturns(this.filterStatus || undefined, this.page, this.pageSize).subscribe({
+      next: res => { this.returns = res.data; this.total = res.total; this.loading = false; },
       error: () => this.loading = false
     });
   }
+
+  changePage(p: number) { this.page = p; this.loadReturns(); }
 
   updateStatus(r: any, status: string) {
     const note = status === 'Rejected' ? prompt('Reason for rejection (optional):') ?? '' : '';

@@ -18,10 +18,10 @@ import { Coupon } from '../../../core/models/admin.models';
 
       <!-- Stats row -->
       <div class="coupon-stats">
-        <div class="cs-card"><span class="cs-num">{{ coupons.length }}</span><span class="cs-label">Total</span></div>
-        <div class="cs-card"><span class="cs-num">{{ activeCoupons }}</span><span class="cs-label">Active</span></div>
-        <div class="cs-card"><span class="cs-num">{{ expiredCoupons }}</span><span class="cs-label">Expired</span></div>
-        <div class="cs-card"><span class="cs-num">{{ totalUsed }}</span><span class="cs-label">Total Uses</span></div>
+        <div class="cs-card"><span class="cs-num">{{ total }}</span><span class="cs-label">Total</span></div>
+        <div class="cs-card"><span class="cs-num">{{ activeCoupons }}</span><span class="cs-label">Active (this page)</span></div>
+        <div class="cs-card"><span class="cs-num">{{ expiredCoupons }}</span><span class="cs-label">Expired (this page)</span></div>
+        <div class="cs-card"><span class="cs-num">{{ totalUsed }}</span><span class="cs-label">Uses (this page)</span></div>
       </div>
 
       <div class="card">
@@ -54,6 +54,11 @@ import { Coupon } from '../../../core/models/admin.models';
               <tr *ngIf="!loading && coupons.length === 0"><td colspan="8" class="empty-row">No coupons yet</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="pagination" *ngIf="total > pageSize">
+          <button [disabled]="page === 1" (click)="changePage(page - 1)">Previous</button>
+          <span>Page {{ page }} of {{ Math.ceil(total / pageSize) }}</span>
+          <button [disabled]="page >= Math.ceil(total / pageSize)" (click)="changePage(page + 1)">Next</button>
         </div>
       </div>
     </div>
@@ -164,11 +169,16 @@ import { Coupon } from '../../../core/models/admin.models';
     .btn-save { background: #6c63ff; color: #fff; border: none; border-radius: 10px; padding: 0.65rem 1.5rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
     .btn-save:disabled { opacity: 0.6; }
     @media (max-width: 640px) { .coupon-stats { grid-template-columns: 1fr 1fr; } }
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; padding: 1rem; font-size: 0.875rem; color: #555; border-top: 1px solid #f5f5f5; }
+    .pagination button { background: #6c63ff; color: #fff; border: none; border-radius: 8px; padding: 0.4rem 1rem; cursor: pointer; font-size: 0.82rem; }
+    .pagination button:disabled { background: #ccc; cursor: not-allowed; }
   `]
 })
 export class AdminCouponsComponent implements OnInit {
   coupons: Coupon[] = [];
   loading = true; saving = false; showModal = false; editing = false;
+  page = 1; pageSize = 20; total = 0;
+  Math = Math;
   form: any = this.emptyForm();
 
   get activeCoupons() { return this.coupons.filter(c => c.isActive && !c.isExpired).length; }
@@ -180,8 +190,13 @@ export class AdminCouponsComponent implements OnInit {
 
   load() {
     this.loading = true;
-    this.adminService.getCoupons().subscribe({ next: c => { this.coupons = c; this.loading = false; }, error: () => this.loading = false });
+    this.adminService.getCoupons(this.page, this.pageSize).subscribe({
+      next: res => { this.coupons = res.data; this.total = res.total; this.loading = false; },
+      error: () => this.loading = false
+    });
   }
+
+  changePage(p: number) { this.page = p; this.load(); }
 
   emptyForm() { return { code: '', discountType: 'Percentage', discountValue: 10, minOrderAmount: 0, maxUses: 0, expiryDate: '', isActive: true }; }
   openAdd() { this.form = this.emptyForm(); this.editing = false; this.showModal = true; }

@@ -30,7 +30,7 @@ import { Product } from './core/models/product.models';
           <a routerLink="/products" routerLinkActive="active">Products</a>
           <a *ngIf="auth.isLoggedIn()" routerLink="/orders" routerLinkActive="active">My Orders</a>
           <a *ngIf="auth.isLoggedIn()" routerLink="/wishlist" routerLinkActive="active">Wishlist</a>
-          <a *ngIf="auth.isAdmin()" routerLink="/admin" routerLinkActive="active" class="admin-link">⚙️ Admin</a>
+          <a *ngIf="auth.isAdminOrManager()" routerLink="/admin" routerLinkActive="active" class="admin-link">⚙️ Admin</a>
         </div>
 
         <!-- Live Search Autocomplete -->

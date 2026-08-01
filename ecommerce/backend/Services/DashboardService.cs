@@ -98,12 +98,13 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
 
     public async Task<List<AdminCustomerDto>> GetAllCustomersAsync() =>
         await db.Users.Where(u => u.Role != "Admin")
+            .OrderByDescending(u => u.Id)
             .Select(u => new AdminCustomerDto(
                 u.Id, u.FullName, u.Email, u.Role,
                 u.CreatedAt.ToString("dd MMM yyyy"),
                 db.Orders.Count(o => o.UserId == u.Id),
                 db.Orders.Where(o => o.UserId == u.Id).Sum(o => (decimal?)o.TotalAmount) ?? 0
-            )).OrderByDescending(u => u.Id).ToListAsync();
+            )).ToListAsync();
 
     public async Task<AdminCustomerDto?> GetCustomerAsync(int userId)
     {

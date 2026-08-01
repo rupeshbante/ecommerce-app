@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { AdminLayoutComponent } from './admin-layout/admin-layout.component';
+import { adminOnlyGuard } from '../../core/guards/admin.guard';
 
 export const adminRoutes: Routes = [
   {
@@ -14,9 +15,9 @@ export const adminRoutes: Routes = [
       { path: 'customers', loadComponent: () => import('./customers/admin-customers.component').then(m => m.AdminCustomersComponent) },
       { path: 'coupons', loadComponent: () => import('./coupons/admin-coupons.component').then(m => m.AdminCouponsComponent) },
       { path: 'reports', loadComponent: () => import('./reports/admin-reports.component').then(m => m.AdminReportsComponent) },
-      { path: 'users', loadComponent: () => import('./users/admin-users.component').then(m => m.AdminUsersComponent) },
+      { path: 'users', canActivate: [adminOnlyGuard], loadComponent: () => import('./users/admin-users.component').then(m => m.AdminUsersComponent) },
       { path: 'returns', loadComponent: () => import('./returns/admin-returns.component').then(m => m.AdminReturnsComponent) },
-      { path: 'audit-logs', loadComponent: () => import('./audit-logs/admin-audit-logs.component').then(m => m.AdminAuditLogsComponent) },
+      { path: 'audit-logs', canActivate: [adminOnlyGuard], loadComponent: () => import('./audit-logs/admin-audit-logs.component').then(m => m.AdminAuditLogsComponent) },
     ]
   }
 ];

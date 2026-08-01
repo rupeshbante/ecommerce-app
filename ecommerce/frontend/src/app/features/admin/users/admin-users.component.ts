@@ -27,8 +27,8 @@ import { AdminCustomer } from '../../../core/models/admin.models';
       </div>
 
       <div class="filters-bar">
-        <input [(ngModel)]="search" (ngModelChange)="applyFilter()" placeholder="🔍 Search users..." class="search-input">
-        <select [(ngModel)]="roleFilter" (ngModelChange)="applyFilter()" class="sel">
+        <input [(ngModel)]="search" (ngModelChange)="onFilterChange()" placeholder="🔍 Search users..." class="search-input">
+        <select [(ngModel)]="roleFilter" (ngModelChange)="onFilterChange()" class="sel">
           <option value="">All Roles</option>
           <option value="Admin">Admin</option>
           <option value="Manager">Manager</option>
@@ -42,7 +42,7 @@ import { AdminCustomer } from '../../../core/models/admin.models';
             <thead><tr><th>ID</th><th>User</th><th>Email</th><th>Current Role</th><th>Orders</th><th>Total Spent</th><th>Joined</th><th>Change Role</th></tr></thead>
             <tbody>
               <tr *ngIf="loading"><td colspan="8" class="empty-row">Loading users...</td></tr>
-              <tr *ngFor="let u of filtered">
+              <tr *ngFor="let u of users">
                 <td><strong>#{{ u.id }}</strong></td>
                 <td>
                   <div class="user-row">
@@ -64,9 +64,14 @@ import { AdminCustomer } from '../../../core/models/admin.models';
                   </div>
                 </td>
               </tr>
-              <tr *ngIf="!loading && filtered.length === 0"><td colspan="8" class="empty-row">No users found</td></tr>
+              <tr *ngIf="!loading && users.length === 0"><td colspan="8" class="empty-row">No users found</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="pagination" *ngIf="total > pageSize">
+          <button [disabled]="page === 1" (click)="changePage(page - 1)">Previous</button>
+          <span>Page {{ page }} of {{ Math.ceil(total / pageSize) }}</span>
+          <button [disabled]="page >= Math.ceil(total / pageSize)" (click)="changePage(page + 1)">Next</button>
         </div>
       </div>
     </div>
@@ -106,12 +111,17 @@ import { AdminCustomer } from '../../../core/models/admin.models';
     .btn-apply:hover:not(:disabled) { background: #5a52d5; }
     .btn-apply:disabled { opacity: 0.4; cursor: not-allowed; }
     @media (max-width: 768px) { .role-legend { grid-template-columns: 1fr; } }
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; padding: 1rem; font-size: 0.875rem; color: #555; border-top: 1px solid #f5f5f5; }
+    .pagination button { background: #6c63ff; color: #fff; border: none; border-radius: 8px; padding: 0.4rem 1rem; cursor: pointer; font-size: 0.82rem; }
+    .pagination button:disabled { background: #ccc; cursor: not-allowed; }
   `]
 })
 export class AdminUsersComponent implements OnInit {
   users: AdminCustomer[] = [];
-  filtered: AdminCustomer[] = [];
   loading = true; search = ''; roleFilter = '';
+  page = 1; pageSize = 20; total = 0;
+  Math = Math;
+  private searchDebounce: any;
   roles = ['Admin', 'Manager', 'Customer'];
   roleChanges: Record<number, string> = {};
 
@@ -123,25 +133,26 @@ export class AdminUsersComponent implements OnInit {
 
   constructor(private adminService: AdminService, private toasts: ToastService) {}
 
-  ngOnInit() {
+  ngOnInit() { this.load(); }
+
+  load() {
     this.loading = true;
-    this.adminService.getCustomers().subscribe({
-      next: u => {
-        this.users = u;
+    this.adminService.getCustomers(this.page, this.pageSize, this.search || undefined, this.roleFilter || undefined).subscribe({
+      next: res => {
+        this.users = res.data;
+        this.total = res.total;
         this.roleChanges = {};
-        u.forEach(x => this.roleChanges[x.id] = x.role);
-        this.applyFilter(); this.loading = false;
+        res.data.forEach((x: AdminCustomer) => this.roleChanges[x.id] = x.role);
+        this.loading = false;
       },
       error: () => this.loading = false
     });
   }
 
-  applyFilter() {
-    this.filtered = this.users.filter(u => {
-      const matchSearch = !this.search || u.fullName.toLowerCase().includes(this.search.toLowerCase()) || u.email.toLowerCase().includes(this.search.toLowerCase());
-      const matchRole = !this.roleFilter || u.role === this.roleFilter;
-      return matchSearch && matchRole;
-    });
+  changePage(p: number) { this.page = p; this.load(); }
+  onFilterChange() {
+    clearTimeout(this.searchDebounce);
+    this.searchDebounce = setTimeout(() => { this.page = 1; this.load(); }, 350);
   }
 
   applyRole(u: AdminCustomer) {

@@ -38,6 +38,19 @@ public class ProductService(AppDbContext db, IEmailService emailService, IConfig
         return products.Select(p => ToDto(p));
     }
 
+    public async Task<PagedResultDto<ProductDto>> GetAllForAdminAsync(string? category, string? search, bool? isActive, int page, int pageSize)
+    {
+        var query = db.Products.Include(p => p.Reviews).Include(p => p.Images).Include(p => p.Variants).AsQueryable();
+        if (!string.IsNullOrEmpty(category)) query = query.Where(p => p.Category == category);
+        if (!string.IsNullOrEmpty(search)) query = query.Where(p => p.Name.Contains(search) || p.Description.Contains(search));
+        if (isActive.HasValue) query = query.Where(p => p.IsActive == isActive.Value);
+        query = query.OrderByDescending(p => p.CreatedAt);
+
+        var total = await query.CountAsync();
+        var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        return new PagedResultDto<ProductDto>(total, page, pageSize, items.Select(ToDto).ToList());
+    }
+
     public async Task<ProductDto?> GetByIdAsync(int id) =>
         await db.Products.Where(p => p.Id == id)
             .Include(p => p.Reviews)

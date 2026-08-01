@@ -14,3 +14,4 @@ export interface Coupon { id: number; code: string; discountType: string; discou
 export interface SalesReport { totalRevenue: number; totalOrders: number; totalCustomers: number; totalProducts: number; dailyRevenue: ChartData[]; monthlyRevenue: ChartData[]; topProducts: TopProduct[]; categoryRevenue: CategoryRevenue[]; }
 export interface CategoryRevenue { category: string; revenue: number; orders: number; }
 export interface AdminProduct { id: number; name: string; description: string; price: number; stock: number; category: string; imageUrl: string; isActive: boolean; }
+export interface PagedResult<T> { total: number; page: number; pageSize: number; data: T[]; }

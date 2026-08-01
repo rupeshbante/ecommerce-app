@@ -12,7 +12,7 @@ namespace ECommerceAPI.Controllers;
 [ApiController]
 [Route("api/admin")]
 [Authorize(Roles = "Admin,Manager")]
-public class AdminController(IDashboardService dashboard, AppDbContext db, IReturnService returnService, IAuditService auditService) : ControllerBase
+public class AdminController(IDashboardService dashboard, AppDbContext db, IReturnService returnService, IAuditService auditService, IProductService productService) : ControllerBase
 {
     private string UserEmail => User.FindFirstValue(ClaimTypes.Email) ?? "";
     private int? UserId => User.FindFirstValue(ClaimTypes.NameIdentifier) is string s ? int.Parse(s) : null;
@@ -25,9 +25,27 @@ public class AdminController(IDashboardService dashboard, AppDbContext db, IRetu
     public async Task<ActionResult<SalesReportDto>> GetReport([FromQuery] int days = 30) =>
         Ok(await dashboard.GetSalesReportAsync(days));
 
+    [HttpGet("products")]
+    public async Task<ActionResult<PagedResultDto<ProductDto>>> GetAdminProducts(
+        [FromQuery] string? category, [FromQuery] string? search, [FromQuery] bool? isActive,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20) =>
+        Ok(await productService.GetAllForAdminAsync(category, search, isActive, page, pageSize));
+
     [HttpGet("orders")]
-    public async Task<ActionResult<List<AdminOrderSummaryDto>>> GetOrders([FromQuery] string? status) =>
-        Ok(await dashboard.GetAllOrdersAsync(status));
+    public async Task<ActionResult<PagedResultDto<AdminOrderSummaryDto>>> GetOrders(
+        [FromQuery] string? status, [FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        var all = await dashboard.GetAllOrdersAsync(status);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            all = all.Where(o => o.CustomerName.Contains(s, StringComparison.OrdinalIgnoreCase)
+                || o.CustomerEmail.Contains(s, StringComparison.OrdinalIgnoreCase)
+                || o.Id.ToString().Contains(s)).ToList();
+        }
+        var items = all.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return Ok(new PagedResultDto<AdminOrderSummaryDto>(all.Count, page, pageSize, items));
+    }
 
     [HttpGet("orders/{id}")]
     public async Task<ActionResult<AdminOrderDetailDto>> GetOrder(int id)
@@ -45,8 +63,20 @@ public class AdminController(IDashboardService dashboard, AppDbContext db, IRetu
     }
 
     [HttpGet("customers")]
-    public async Task<ActionResult<List<AdminCustomerDto>>> GetCustomers() =>
-        Ok(await dashboard.GetAllCustomersAsync());
+    public async Task<ActionResult<PagedResultDto<AdminCustomerDto>>> GetCustomers(
+        [FromQuery] string? search, [FromQuery] string? role, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        var all = await dashboard.GetAllCustomersAsync();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            all = all.Where(c => c.FullName.Contains(s, StringComparison.OrdinalIgnoreCase)
+                || c.Email.Contains(s, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+        if (!string.IsNullOrWhiteSpace(role)) all = all.Where(c => c.Role == role).ToList();
+        var items = all.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return Ok(new PagedResultDto<AdminCustomerDto>(all.Count, page, pageSize, items));
+    }
 
     [HttpGet("customers/{id}")]
     public async Task<ActionResult<AdminCustomerDto>> GetCustomer(int id)
@@ -89,8 +119,13 @@ public class AdminController(IDashboardService dashboard, AppDbContext db, IRetu
 
     // ── Returns Management ──────────────────────────────────────
     [HttpGet("returns")]
-    public async Task<IActionResult> GetReturns([FromQuery] string? status) =>
-        Ok(await returnService.GetAllReturnRequestsAsync(status));
+    public async Task<IActionResult> GetReturns(
+        [FromQuery] string? status, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        var all = await returnService.GetAllReturnRequestsAsync(status);
+        var items = all.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        return Ok(new PagedResultDto<ReturnRequestDto>(all.Count, page, pageSize, items));
+    }
 
     [HttpPut("returns/{id}/status")]
     public async Task<IActionResult> UpdateReturnStatus(int id, [FromBody] UpdateReturnStatusDto dto)

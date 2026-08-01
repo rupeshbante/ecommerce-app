@@ -12,17 +12,16 @@ import { AdminOrderSummary, AdminOrderDetail } from '../../../core/models/admin.
   template: `
     <div class="page-wrap">
       <div class="page-head">
-        <div><h1>Orders</h1><p>{{ filtered.length }} orders found</p></div>
+        <div><h1>Orders</h1><p>{{ total }} orders found</p></div>
         <div class="status-tabs">
           <button *ngFor="let s of statuses" [class.active]="activeStatus === s.val" (click)="setStatus(s.val)">
             {{ s.label }}
-            <span class="tab-count">{{ getCount(s.val) }}</span>
           </button>
         </div>
       </div>
 
       <div class="filters-bar">
-        <input [(ngModel)]="search" (ngModelChange)="applyFilter()" placeholder="🔍 Search by customer, email, order #..." class="search-input">
+        <input [(ngModel)]="search" (ngModelChange)="onSearchChange()" placeholder="🔍 Search by customer, email, order #..." class="search-input">
       </div>
 
       <div class="card">
@@ -31,7 +30,7 @@ import { AdminOrderSummary, AdminOrderDetail } from '../../../core/models/admin.
             <thead><tr><th>#</th><th>Customer</th><th>Email</th><th>Items</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
             <tbody>
               <tr *ngIf="loading"><td colspan="8" class="empty-row">Loading orders...</td></tr>
-              <tr *ngFor="let o of filtered">
+              <tr *ngFor="let o of orders">
                 <td><strong>#{{ o.id }}</strong></td>
                 <td>{{ o.customerName }}</td>
                 <td class="email-cell">{{ o.customerEmail }}</td>
@@ -47,9 +46,14 @@ import { AdminOrderSummary, AdminOrderDetail } from '../../../core/models/admin.
                   <button class="btn-icon" (click)="viewDetail(o.id)" title="View details">👁</button>
                 </td>
               </tr>
-              <tr *ngIf="!loading && filtered.length === 0"><td colspan="8" class="empty-row">No orders found</td></tr>
+              <tr *ngIf="!loading && orders.length === 0"><td colspan="8" class="empty-row">No orders found</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="pagination" *ngIf="total > pageSize">
+          <button [disabled]="page === 1" (click)="changePage(page - 1)">Previous</button>
+          <span>Page {{ page }} of {{ Math.ceil(total / pageSize) }}</span>
+          <button [disabled]="page >= Math.ceil(total / pageSize)" (click)="changePage(page + 1)">Next</button>
         </div>
       </div>
     </div>
@@ -159,13 +163,18 @@ import { AdminOrderSummary, AdminOrderDetail } from '../../../core/models/admin.
     .status-row { display: flex; gap: 0.75rem; }
     .sel { padding: 0.6rem 0.85rem; border: 1.5px solid #e9ecef; border-radius: 10px; font-size: 0.875rem; outline: none; flex: 1; }
     .btn-update { background: #6c63ff; color: #fff; border: none; border-radius: 10px; padding: 0.65rem 1.25rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; padding: 1rem; font-size: 0.875rem; color: #555; border-top: 1px solid #f5f5f5; }
+    .pagination button { background: #6c63ff; color: #fff; border: none; border-radius: 8px; padding: 0.4rem 1rem; cursor: pointer; font-size: 0.82rem; }
+    .pagination button:disabled { background: #ccc; cursor: not-allowed; }
   `]
 })
 export class AdminOrdersComponent implements OnInit {
   orders: AdminOrderSummary[] = [];
-  filtered: AdminOrderSummary[] = [];
   detail: AdminOrderDetail | null = null;
   loading = true; search = ''; activeStatus = '';
+  page = 1; pageSize = 20; total = 0;
+  Math = Math;
+  private searchDebounce: any;
   newStatus = 'Pending';
   statusOptions = ['Pending', 'Processing', 'Delivered', 'Cancelled'];
   statuses = [
@@ -181,18 +190,17 @@ export class AdminOrdersComponent implements OnInit {
 
   load() {
     this.loading = true;
-    this.adminService.getOrders().subscribe({ next: o => { this.orders = o; this.applyFilter(); this.loading = false; }, error: () => this.loading = false });
+    this.adminService.getOrders(this.activeStatus || undefined, this.page, this.pageSize, this.search || undefined).subscribe({
+      next: res => { this.orders = res.data; this.total = res.total; this.loading = false; },
+      error: () => this.loading = false
+    });
   }
 
-  setStatus(s: string) { this.activeStatus = s; this.applyFilter(); }
-  getCount(status: string) { return status ? this.orders.filter(o => o.status === status).length : this.orders.length; }
-
-  applyFilter() {
-    this.filtered = this.orders.filter(o => {
-      const matchStatus = !this.activeStatus || o.status === this.activeStatus;
-      const matchSearch = !this.search || o.customerName.toLowerCase().includes(this.search.toLowerCase()) || o.customerEmail.toLowerCase().includes(this.search.toLowerCase()) || String(o.id).includes(this.search);
-      return matchStatus && matchSearch;
-    });
+  setStatus(s: string) { this.activeStatus = s; this.page = 1; this.load(); }
+  changePage(p: number) { this.page = p; this.load(); }
+  onSearchChange() {
+    clearTimeout(this.searchDebounce);
+    this.searchDebounce = setTimeout(() => { this.page = 1; this.load(); }, 350);
   }
 
   updateStatus(o: AdminOrderSummary, status: string) {

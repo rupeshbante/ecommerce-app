@@ -11,11 +11,11 @@ import { AdminCustomer, AdminOrderSummary } from '../../../core/models/admin.mod
   template: `
     <div class="page-wrap">
       <div class="page-head">
-        <div><h1>Customers</h1><p>{{ filtered.length }} registered customers</p></div>
+        <div><h1>Customers</h1><p>{{ total }} registered customers</p></div>
       </div>
       <div class="filters-bar">
-        <input [(ngModel)]="search" (ngModelChange)="applyFilter()" placeholder="🔍 Search name, email..." class="search-input">
-        <select [(ngModel)]="roleFilter" (ngModelChange)="applyFilter()" class="sel">
+        <input [(ngModel)]="search" (ngModelChange)="onFilterChange()" placeholder="🔍 Search name, email..." class="search-input">
+        <select [(ngModel)]="roleFilter" (ngModelChange)="onFilterChange()" class="sel">
           <option value="">All Roles</option>
           <option value="Customer">Customer</option>
           <option value="Manager">Manager</option>
@@ -27,7 +27,7 @@ import { AdminCustomer, AdminOrderSummary } from '../../../core/models/admin.mod
             <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Orders</th><th>Total Spent</th><th>Joined</th><th>Actions</th></tr></thead>
             <tbody>
               <tr *ngIf="loading"><td colspan="8" class="empty-row">Loading...</td></tr>
-              <tr *ngFor="let c of filtered">
+              <tr *ngFor="let c of customers">
                 <td><strong>#{{ c.id }}</strong></td>
                 <td>
                   <div class="cust-row">
@@ -44,9 +44,14 @@ import { AdminCustomer, AdminOrderSummary } from '../../../core/models/admin.mod
                   <button class="btn-icon" (click)="viewCustomer(c)" title="View details">👁</button>
                 </td>
               </tr>
-              <tr *ngIf="!loading && filtered.length === 0"><td colspan="8" class="empty-row">No customers found</td></tr>
+              <tr *ngIf="!loading && customers.length === 0"><td colspan="8" class="empty-row">No customers found</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="pagination" *ngIf="total > pageSize">
+          <button [disabled]="page === 1" (click)="changePage(page - 1)">Previous</button>
+          <span>Page {{ page }} of {{ Math.ceil(total / pageSize) }}</span>
+          <button [disabled]="page >= Math.ceil(total / pageSize)" (click)="changePage(page + 1)">Next</button>
         </div>
       </div>
     </div>
@@ -142,27 +147,35 @@ import { AdminCustomer, AdminOrderSummary } from '../../../core/models/admin.mod
     .badge-delivered { background: #e8f5e9; color: #2e7d32; }
     .badge-cancelled { background: #fce4ec; color: #c62828; }
     .no-orders { text-align: center; color: #888; font-size: 0.875rem; }
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; padding: 1rem; font-size: 0.875rem; color: #555; border-top: 1px solid #f5f5f5; }
+    .pagination button { background: #6c63ff; color: #fff; border: none; border-radius: 8px; padding: 0.4rem 1rem; cursor: pointer; font-size: 0.82rem; }
+    .pagination button:disabled { background: #ccc; cursor: not-allowed; }
   `]
 })
 export class AdminCustomersComponent implements OnInit {
   customers: AdminCustomer[] = [];
-  filtered: AdminCustomer[] = [];
   loading = true; search = ''; roleFilter = '';
+  page = 1; pageSize = 20; total = 0;
+  Math = Math;
+  private searchDebounce: any;
   selected: AdminCustomer | null = null;
   custOrders: AdminOrderSummary[] = [];
 
   constructor(private adminService: AdminService) {}
-  ngOnInit() {
+  ngOnInit() { this.load(); }
+
+  load() {
     this.loading = true;
-    this.adminService.getCustomers().subscribe({ next: c => { this.customers = c; this.applyFilter(); this.loading = false; }, error: () => this.loading = false });
+    this.adminService.getCustomers(this.page, this.pageSize, this.search || undefined, this.roleFilter || undefined).subscribe({
+      next: res => { this.customers = res.data; this.total = res.total; this.loading = false; },
+      error: () => this.loading = false
+    });
   }
 
-  applyFilter() {
-    this.filtered = this.customers.filter(c => {
-      const matchSearch = !this.search || c.fullName.toLowerCase().includes(this.search.toLowerCase()) || c.email.toLowerCase().includes(this.search.toLowerCase());
-      const matchRole = !this.roleFilter || c.role === this.roleFilter;
-      return matchSearch && matchRole;
-    });
+  changePage(p: number) { this.page = p; this.load(); }
+  onFilterChange() {
+    clearTimeout(this.searchDebounce);
+    this.searchDebounce = setTimeout(() => { this.page = 1; this.load(); }, 350);
   }
 
   viewCustomer(c: AdminCustomer) {

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { DashboardStats, AdminOrderSummary, AdminOrderDetail, AdminCustomer, CategoryItem, Coupon, SalesReport, AdminProduct } from '../models/admin.models';
+import { DashboardStats, AdminOrderSummary, AdminOrderDetail, AdminCustomer, CategoryItem, Coupon, SalesReport, AdminProduct, PagedResult } from '../models/admin.models';
 import { Product, CreateProduct } from '../models/product.models';
 
 @Injectable({ providedIn: 'root' })
@@ -14,16 +14,22 @@ export class AdminService {
   getReport(days = 30) { return this.http.get<SalesReport>(`${this.api}/admin/report?days=${days}`); }
 
   // Orders
-  getOrders(status?: string) {
-    let params = new HttpParams();
+  getOrders(status?: string, page = 1, pageSize = 20, search?: string) {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
     if (status) params = params.set('status', status);
-    return this.http.get<AdminOrderSummary[]>(`${this.api}/admin/orders`, { params });
+    if (search) params = params.set('search', search);
+    return this.http.get<PagedResult<AdminOrderSummary>>(`${this.api}/admin/orders`, { params });
   }
   getOrder(id: number) { return this.http.get<AdminOrderDetail>(`${this.api}/admin/orders/${id}`); }
   updateOrderStatus(id: number, status: string) { return this.http.put(`${this.api}/admin/orders/${id}/status`, { status }); }
 
   // Customers
-  getCustomers() { return this.http.get<AdminCustomer[]>(`${this.api}/admin/customers`); }
+  getCustomers(page = 1, pageSize = 20, search?: string, role?: string) {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    if (search) params = params.set('search', search);
+    if (role) params = params.set('role', role);
+    return this.http.get<PagedResult<AdminCustomer>>(`${this.api}/admin/customers`, { params });
+  }
   getCustomer(id: number) { return this.http.get<AdminCustomer>(`${this.api}/admin/customers/${id}`); }
   getCustomerOrders(id: number) { return this.http.get<AdminOrderSummary[]>(`${this.api}/admin/customers/${id}/orders`); }
 
@@ -32,6 +38,13 @@ export class AdminService {
 
   // Products
   getAllProducts() { return this.http.get<Product[]>(`${this.api}/products`); }
+  getAdminProducts(page = 1, pageSize = 20, search?: string, category?: string, isActive?: boolean) {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    if (search) params = params.set('search', search);
+    if (category) params = params.set('category', category);
+    if (isActive !== undefined) params = params.set('isActive', isActive);
+    return this.http.get<PagedResult<Product>>(`${this.api}/admin/products`, { params });
+  }
   createProduct(data: CreateProduct) { return this.http.post<Product>(`${this.api}/products`, data); }
   updateProduct(id: number, data: Partial<Product>) { return this.http.put<Product>(`${this.api}/products/${id}`, data); }
   deleteProduct(id: number) { return this.http.delete(`${this.api}/products/${id}`); }
@@ -41,6 +54,27 @@ export class AdminService {
     return this.http.post<{ url: string }>(`${this.api}/admin/upload-image`, form);
   }
   getLowStockSummary() { return this.http.get<any[]>(`${this.api}/admin/low-stock-summary`); }
+
+  // Product Images
+  getProductImages(productId: number) { return this.http.get<any[]>(`${this.api}/products/${productId}/images`); }
+  addProductImage(productId: number, data: { url: string; isPrimary: boolean; sortOrder: number }) {
+    return this.http.post<any>(`${this.api}/products/${productId}/images`, data);
+  }
+  deleteProductImage(productId: number, imageId: number) {
+    return this.http.delete(`${this.api}/products/${productId}/images/${imageId}`);
+  }
+
+  // Product Variants
+  getProductVariants(productId: number) { return this.http.get<any[]>(`${this.api}/products/${productId}/variants`); }
+  addProductVariant(productId: number, data: { name: string; value: string; priceModifier: number; stock: number; sku: string }) {
+    return this.http.post<any>(`${this.api}/products/${productId}/variants`, data);
+  }
+  updateProductVariant(productId: number, variantId: number, data: { name: string; value: string; priceModifier: number; stock: number; sku: string; isActive: boolean }) {
+    return this.http.put<any>(`${this.api}/products/${productId}/variants/${variantId}`, data);
+  }
+  deleteProductVariant(productId: number, variantId: number) {
+    return this.http.delete(`${this.api}/products/${productId}/variants/${variantId}`);
+  }
 
   // Bulk CSV Import
   bulkImportProducts(file: File) {
@@ -57,16 +91,19 @@ export class AdminService {
   deleteCategory(id: number) { return this.http.delete(`${this.api}/categories/${id}`); }
 
   // Coupons
-  getCoupons() { return this.http.get<Coupon[]>(`${this.api}/coupons`); }
+  getCoupons(page = 1, pageSize = 20) {
+    const params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    return this.http.get<PagedResult<Coupon>>(`${this.api}/coupons`, { params });
+  }
   createCoupon(data: any) { return this.http.post<Coupon>(`${this.api}/coupons`, data); }
   updateCoupon(id: number, data: any) { return this.http.put<Coupon>(`${this.api}/coupons/${id}`, data); }
   deleteCoupon(id: number) { return this.http.delete(`${this.api}/coupons/${id}`); }
 
   // Returns
-  getReturns(status?: string) {
-    let params = new HttpParams();
+  getReturns(status?: string, page = 1, pageSize = 20) {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
     if (status) params = params.set('status', status);
-    return this.http.get<any[]>(`${this.api}/admin/returns`, { params });
+    return this.http.get<PagedResult<any>>(`${this.api}/admin/returns`, { params });
   }
   updateReturnStatus(id: number, status: string, adminNote = '') {
     return this.http.put(`${this.api}/admin/returns/${id}/status`, { status, adminNote });

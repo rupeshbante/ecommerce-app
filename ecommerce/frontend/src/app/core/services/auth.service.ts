@@ -48,6 +48,8 @@ export class AuthService {
   getToken(): string | null { return localStorage.getItem('token'); }
   isLoggedIn(): boolean { return !!this.getToken(); }
   isAdmin(): boolean { return this.currentUser()?.role === 'Admin'; }
+  isManager(): boolean { return this.currentUser()?.role === 'Manager'; }
+  isAdminOrManager(): boolean { const role = this.currentUser()?.role; return role === 'Admin' || role === 'Manager'; }
 
   private storeAuth(res: AuthResponse) {
     localStorage.setItem('token', res.token);

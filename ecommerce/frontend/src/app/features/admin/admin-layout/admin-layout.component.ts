@@ -139,21 +139,25 @@ export class AdminLayoutComponent {
   sidebarCollapsed = signal(false);
   now = new Date();
 
-  navItems = [
-    { path: '/admin/dashboard', icon: '📊', label: 'Dashboard' },
-    { path: '/admin/products', icon: '📦', label: 'Products' },
-    { path: '/admin/categories', icon: '🗂️', label: 'Categories' },
-    { path: '/admin/orders', icon: '🛒', label: 'Orders' },
-    { path: '/admin/returns', icon: '↩️', label: 'Returns' },
-    { path: '/admin/customers', icon: '👥', label: 'Customers' },
-    { path: '/admin/coupons', icon: '🎟️', label: 'Coupons' },
-    { path: '/admin/reports', icon: '📈', label: 'Reports' },
-    { path: '/admin/users', icon: '🔐', label: 'Users & Roles' },
-    { path: '/admin/audit-logs', icon: '📋', label: 'Audit Logs' },
+  allNavItems = [
+    { path: '/admin/dashboard', icon: '📊', label: 'Dashboard', adminOnly: false },
+    { path: '/admin/products', icon: '📦', label: 'Products', adminOnly: false },
+    { path: '/admin/categories', icon: '🗂️', label: 'Categories', adminOnly: false },
+    { path: '/admin/orders', icon: '🛒', label: 'Orders', adminOnly: false },
+    { path: '/admin/returns', icon: '↩️', label: 'Returns', adminOnly: false },
+    { path: '/admin/customers', icon: '👥', label: 'Customers', adminOnly: false },
+    { path: '/admin/coupons', icon: '🎟️', label: 'Coupons', adminOnly: false },
+    { path: '/admin/reports', icon: '📈', label: 'Reports', adminOnly: false },
+    { path: '/admin/users', icon: '🔐', label: 'Users & Roles', adminOnly: true },
+    { path: '/admin/audit-logs', icon: '📋', label: 'Audit Logs', adminOnly: true },
   ];
 
   constructor(public auth: AuthService) {
     setInterval(() => this.now = new Date(), 30000);
+  }
+
+  get navItems() {
+    return this.auth.isAdmin() ? this.allNavItems : this.allNavItems.filter(i => !i.adminOnly);
   }
 
   toggleSidebar() { this.sidebarCollapsed.update(v => !v); }
