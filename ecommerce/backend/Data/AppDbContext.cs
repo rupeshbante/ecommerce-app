@@ -85,7 +85,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasOne(h => h.Order).WithMany(o => o.StatusHistory).HasForeignKey(h => h.OrderId);
 
         modelBuilder.Entity<ReturnRequest>()
-            .HasOne(r => r.User).WithMany().HasForeignKey(r => r.UserId);
+            .HasOne(r => r.User).WithMany().HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<ProductImage>()
             .HasOne(pi => pi.Product).WithMany(p => p.Images).HasForeignKey(pi => pi.ProductId);
