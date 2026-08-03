@@ -29,15 +29,31 @@ public class ReferralService(AppDbContext db) : IReferralService
         var alreadyUsed = await db.Referrals.AnyAsync(r => r.ReferredUserId == newUserId);
         if (alreadyUsed) return false;
 
-        db.Referrals.Add(new Referral
+        var newUser = await db.Users.FindAsync(newUserId);
+        if (newUser == null) return false;
+
+        var referral = new Referral
         {
             ReferrerId = referrer.Id,
             ReferredUserId = newUserId,
             Code = code,
             IsUsed = true,
             UsedAt = DateTime.UtcNow
-        });
+        };
+        db.Referrals.Add(referral);
         await db.SaveChangesAsync();
+
+        // Credit both sides with loyalty points equal to the reward amount (1 point = ₹1),
+        // redeemable at checkout the same way any other earned points are.
+        var points = (int)referral.RewardAmount;
+        referrer.LoyaltyPoints += points;
+        newUser.LoyaltyPoints += points;
+        db.LoyaltyPointTransactions.AddRange(
+            new LoyaltyPointTransaction { UserId = referrer.Id, Points = points, Reason = "ReferralBonus" },
+            new LoyaltyPointTransaction { UserId = newUser.Id, Points = points, Reason = "ReferralBonus" }
+        );
+        await db.SaveChangesAsync();
+
         return true;
     }
 

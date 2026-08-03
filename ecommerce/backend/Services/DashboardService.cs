@@ -30,9 +30,10 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
             revenueByDay.Add(new ChartDataDto(date.ToString("ddd dd"), rev));
         }
 
-        // Top products by revenue
-        var topProducts = await db.OrderItems
-            .Include(oi => oi.Product)
+        // Top products by revenue (grouped client-side after materializing — GroupBy+nested Sum
+        // in a single Select doesn't translate on the SQL Server provider, only Npgsql)
+        var allOrderItems = await db.OrderItems.Include(oi => oi.Product).ToListAsync();
+        var topProducts = allOrderItems
             .GroupBy(oi => new { oi.ProductId, oi.Product.Name, oi.Product.Category })
             .Select(g => new TopProductDto(
                 g.Key.ProductId, g.Key.Name, g.Key.Category,
@@ -41,7 +42,7 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
             ))
             .OrderByDescending(t => t.Revenue)
             .Take(5)
-            .ToListAsync();
+            .ToList();
 
         // Recent orders
         var recentOrders = await db.Orders

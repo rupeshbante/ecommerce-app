@@ -118,7 +118,7 @@ import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.mo
       <div *ngIf="tab === 'referral'" class="referral-section">
         <div class="ref-hero">
           <h2>Refer Friends & Earn ₹100</h2>
-          <p>Share your unique referral code. When a friend signs up using your code, you both get ₹100 discount!</p>
+          <p>Share your unique referral code. When a friend signs up using your code, you both get ₹100 in loyalty points!</p>
         </div>
 
         <div class="ref-code-card" *ngIf="referralCode">
@@ -128,6 +128,16 @@ import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.mo
             <button class="btn-copy" (click)="copyCode()">{{ copied ? 'Copied!' : 'Copy' }}</button>
           </div>
           <p class="share-text">Share link: shopease.in/register?ref={{ referralCode }}</p>
+        </div>
+
+        <div class="ref-code-card">
+          <span class="code-label">Have a Friend's Code?</span>
+          <div class="code-box">
+            <input [(ngModel)]="applyCodeInput" placeholder="Enter referral code" class="apply-code-input" [disabled]="applyingCode">
+            <button class="btn-copy" (click)="applyReferralCode()" [disabled]="applyingCode || !applyCodeInput.trim()">
+              {{ applyingCode ? 'Applying...' : 'Redeem' }}
+            </button>
+          </div>
         </div>
 
         <div class="ref-stats" *ngIf="refStats">
@@ -150,7 +160,7 @@ import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.mo
           <div class="steps">
             <div class="step"><span class="step-num">1</span><p>Share your code with friends</p></div>
             <div class="step"><span class="step-num">2</span><p>Friend registers using your code</p></div>
-            <div class="step"><span class="step-num">3</span><p>Both of you get ₹100 discount!</p></div>
+            <div class="step"><span class="step-num">3</span><p>Both of you get ₹100 in loyalty points!</p></div>
           </div>
         </div>
       </div>
@@ -247,6 +257,7 @@ import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.mo
     .btn-copy { background: #6c63ff; color: #fff; border: none; border-radius: 8px; padding: 0.5rem 1.25rem; font-weight: 600; cursor: pointer; transition: background 0.18s; }
     .btn-copy:hover { background: #5a52d5; }
     .share-text { font-size: 0.8rem; color: #888; }
+    .apply-code-input { flex: 1; border: none; background: transparent; font-size: 0.95rem; font-weight: 600; color: #1a1a2e; outline: none; }
     .ref-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 2rem; }
     .stat-box { background: #fff; border-radius: 14px; padding: 1.25rem; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
     .stat-num { display: block; font-size: 1.6rem; font-weight: 800; color: #1a1a2e; }
@@ -277,6 +288,8 @@ export class ProfileComponent implements OnInit {
   referralCode = '';
   refStats: any = null;
   copied = false;
+  applyCodeInput = '';
+  applyingCode = false;
   loyaltyBalance: LoyaltyBalance | null = null;
   loyaltyHistory: LoyaltyTransaction[] = [];
 
@@ -301,6 +314,25 @@ export class ProfileComponent implements OnInit {
     if (this.referralCode) return;
     this.referralService.getMyCode().subscribe(r => this.referralCode = r.code);
     this.referralService.getStats().subscribe(s => this.refStats = s);
+  }
+
+  applyReferralCode() {
+    const code = this.applyCodeInput.trim();
+    if (!code) return;
+    this.applyingCode = true;
+    this.referralService.applyCode(code).subscribe({
+      next: (res: any) => {
+        this.applyingCode = false;
+        this.applyCodeInput = '';
+        this.toasts.success(res?.message || 'Referral code applied!');
+        this.loyaltyBalance = null;
+        this.loadLoyalty();
+      },
+      error: (err) => {
+        this.applyingCode = false;
+        this.toasts.error(err?.error?.message || 'Invalid or already used code.');
+      }
+    });
   }
 
   loadLoyalty() {
