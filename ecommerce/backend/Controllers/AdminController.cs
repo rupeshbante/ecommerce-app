@@ -57,7 +57,7 @@ public class AdminController(IDashboardService dashboard, AppDbContext db, IRetu
     [HttpPut("orders/{id}/status")]
     public async Task<IActionResult> UpdateOrderStatus(int id, [FromBody] UpdateOrderStatusDto dto)
     {
-        var ok = await dashboard.UpdateOrderStatusAsync(id, dto.Status);
+        var ok = await dashboard.UpdateOrderStatusAsync(id, dto.Status, dto.TrackingNumber, dto.Carrier);
         if (ok) await auditService.LogAsync(UserId, UserEmail, "Update", "Order", id.ToString(), null, $"Status: {dto.Status}", HttpContext.Connection.RemoteIpAddress?.ToString() ?? "");
         return ok ? NoContent() : NotFound();
     }
@@ -164,7 +164,7 @@ public class AdminController(IDashboardService dashboard, AppDbContext db, IRetu
         csv.AppendLine("Order ID,Customer Name,Customer Email,Order Date,Status,Total Amount,Items Count,Shipping Address");
 
         foreach (var o in orders)
-            csv.AppendLine($"{o.Id},{EscapeCsv(o.User.FullName)},{EscapeCsv(o.User.Email)},{o.OrderDate:dd MMM yyyy},{o.Status},{o.TotalAmount:N2},{o.OrderItems.Count},{EscapeCsv(o.ShippingAddress)}");
+            csv.AppendLine($"{o.Id},{EscapeCsv(o.User?.FullName ?? o.GuestName ?? "Guest")},{EscapeCsv(o.User?.Email ?? o.GuestEmail ?? "")},{o.OrderDate:dd MMM yyyy},{o.Status},{o.TotalAmount:N2},{o.OrderItems.Count},{EscapeCsv(o.ShippingAddress)}");
 
         var bytes = Encoding.UTF8.GetBytes(csv.ToString());
         return File(bytes, "text/csv", $"sales_report_{DateTime.UtcNow:yyyyMMdd}.csv");

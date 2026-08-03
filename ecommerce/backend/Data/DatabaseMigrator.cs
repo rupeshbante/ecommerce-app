@@ -20,6 +20,15 @@ public static class DatabaseMigrator
             "ALTER TABLE \"Products\" ADD COLUMN IF NOT EXISTS \"SaleEndsAt\" TIMESTAMP",
             "ALTER TABLE \"Users\" ADD COLUMN IF NOT EXISTS \"PasswordResetToken\" TEXT",
             "ALTER TABLE \"Users\" ADD COLUMN IF NOT EXISTS \"PasswordResetExpiry\" TIMESTAMP",
+            "ALTER TABLE \"Orders\" ADD COLUMN IF NOT EXISTS \"TrackingNumber\" TEXT",
+            "ALTER TABLE \"Orders\" ADD COLUMN IF NOT EXISTS \"Carrier\" TEXT",
+            "ALTER TABLE \"Orders\" ALTER COLUMN \"UserId\" DROP NOT NULL",
+            "ALTER TABLE \"Orders\" ADD COLUMN IF NOT EXISTS \"GuestEmail\" TEXT",
+            "ALTER TABLE \"Orders\" ADD COLUMN IF NOT EXISTS \"GuestName\" TEXT",
+            "ALTER TABLE \"Orders\" ADD COLUMN IF NOT EXISTS \"GuestPhone\" TEXT",
+            "ALTER TABLE \"Users\" ADD COLUMN IF NOT EXISTS \"LoyaltyPoints\" INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE \"Orders\" ADD COLUMN IF NOT EXISTS \"PointsRedeemed\" INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE \"Orders\" ADD COLUMN IF NOT EXISTS \"PointsDiscountAmount\" NUMERIC(18,2) NOT NULL DEFAULT 0",
         };
 
         foreach (var sql in alterStatements)
@@ -173,6 +182,48 @@ public static class DatabaseMigrator
             )",
 
             @"CREATE INDEX IF NOT EXISTS ""IX_OrderStatusHistories_OrderId"" ON ""OrderStatusHistories""(""OrderId"")",
+
+            @"CREATE TABLE IF NOT EXISTS ""CartItems"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""UserId"" INTEGER NOT NULL REFERENCES ""Users""(""Id""),
+                ""ProductId"" INTEGER NOT NULL REFERENCES ""Products""(""Id"") ON DELETE CASCADE,
+                ""VariantId"" INTEGER REFERENCES ""ProductVariants""(""Id""),
+                ""Quantity"" INTEGER NOT NULL DEFAULT 1,
+                ""AddedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
+            )",
+
+            @"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CartItems_UserId_ProductId_VariantId"" ON ""CartItems""(""UserId"", ""ProductId"", COALESCE(""VariantId"", -1))",
+
+            @"CREATE TABLE IF NOT EXISTS ""LoyaltyPointTransactions"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""UserId"" INTEGER NOT NULL REFERENCES ""Users""(""Id""),
+                ""Points"" INTEGER NOT NULL DEFAULT 0,
+                ""Reason"" TEXT NOT NULL DEFAULT '',
+                ""OrderId"" INTEGER,
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
+            )",
+
+            @"CREATE INDEX IF NOT EXISTS ""IX_LoyaltyPointTransactions_UserId"" ON ""LoyaltyPointTransactions""(""UserId"")",
+
+            @"CREATE TABLE IF NOT EXISTS ""ProductQuestions"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""ProductId"" INTEGER NOT NULL REFERENCES ""Products""(""Id"") ON DELETE CASCADE,
+                ""UserId"" INTEGER NOT NULL REFERENCES ""Users""(""Id""),
+                ""Question"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
+            )",
+
+            @"CREATE INDEX IF NOT EXISTS ""IX_ProductQuestions_ProductId"" ON ""ProductQuestions""(""ProductId"")",
+
+            @"CREATE TABLE IF NOT EXISTS ""ProductAnswers"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""ProductQuestionId"" INTEGER NOT NULL REFERENCES ""ProductQuestions""(""Id"") ON DELETE CASCADE,
+                ""UserId"" INTEGER NOT NULL REFERENCES ""Users""(""Id""),
+                ""Answer"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
+            )",
+
+            @"CREATE INDEX IF NOT EXISTS ""IX_ProductAnswers_ProductQuestionId"" ON ""ProductAnswers""(""ProductQuestionId"")",
         };
 
         foreach (var sql in tables)

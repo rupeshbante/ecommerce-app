@@ -50,7 +50,7 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
             .OrderByDescending(o => o.OrderDate)
             .Take(8)
             .Select(o => new AdminOrderSummaryDto(
-                o.Id, o.User.FullName, o.User.Email, o.TotalAmount,
+                o.Id, o.User != null ? o.User.FullName : (o.GuestName ?? "Guest"), o.User != null ? o.User.Email : (o.GuestEmail ?? ""), o.TotalAmount,
                 o.Status, o.OrderDate.ToString("dd MMM yyyy HH:mm"), o.OrderItems.Count
             ))
             .ToListAsync();
@@ -120,7 +120,7 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
             .Where(o => status == null || o.Status == status)
             .OrderByDescending(o => o.OrderDate)
             .Select(o => new AdminOrderSummaryDto(
-                o.Id, o.User.FullName, o.User.Email, o.TotalAmount,
+                o.Id, o.User != null ? o.User.FullName : (o.GuestName ?? "Guest"), o.User != null ? o.User.Email : (o.GuestEmail ?? ""), o.TotalAmount,
                 o.Status, o.OrderDate.ToString("dd MMM yyyy HH:mm"), o.OrderItems.Count
             )).ToListAsync();
 
@@ -130,18 +130,22 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
             .ThenInclude(oi => oi.Product).FirstOrDefaultAsync(o => o.Id == orderId);
         if (order == null) return null;
         return new AdminOrderDetailDto(
-            order.Id, order.User.FullName, order.User.Email, order.TotalAmount,
+            order.Id, order.User?.FullName ?? order.GuestName ?? "Guest", order.User?.Email ?? order.GuestEmail ?? "", order.TotalAmount,
             order.Status, order.ShippingAddress, order.OrderDate.ToString("dd MMM yyyy HH:mm"),
             order.OrderItems.Select(oi => new AdminOrderItemDto(
-                oi.ProductId, oi.Product.Name, oi.Quantity, oi.UnitPrice)).ToList()
+                oi.ProductId, oi.Product.Name, oi.Quantity, oi.UnitPrice)).ToList(),
+            order.TrackingNumber, order.Carrier
         );
     }
 
-    public async Task<bool> UpdateOrderStatusAsync(int orderId, string status)
+    public async Task<bool> UpdateOrderStatusAsync(int orderId, string status, string? trackingNumber = null, string? carrier = null)
     {
         var order = await db.Orders.Include(o => o.User).FirstOrDefaultAsync(o => o.Id == orderId);
         if (order == null) return false;
+        var wasAlreadyDelivered = order.Status == "Delivered";
         order.Status = status;
+        if (trackingNumber != null) order.TrackingNumber = trackingNumber;
+        if (carrier != null) order.Carrier = carrier;
         db.OrderStatusHistories.Add(new ECommerceAPI.Models.OrderStatusHistory
         {
             OrderId = orderId,
@@ -158,18 +162,46 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
         await db.SaveChangesAsync();
 
         // Send email + notification based on status
-        var user = order.User;
-        if (status == "Shipped")
+        var email = order.User?.Email ?? order.GuestEmail;
+        var name = order.User?.FullName ?? order.GuestName ?? "Customer";
+        if (status == "Processing")
         {
-            _ = emailService.SendOrderShippedAsync(user.Email, user.FullName, orderId);
-            await notificationService.CreateNotificationAsync(new DTOs.CreateNotificationDto(
-                user.Id, "Order Shipped!", $"Your order #{orderId} is on its way!", "order", "/orders"));
+            if (email != null) _ = emailService.SendOrderProcessingAsync(email, name, orderId);
+            if (order.UserId.HasValue) await notificationService.CreateNotificationAsync(new DTOs.CreateNotificationDto(
+                order.UserId.Value, "Order Processing", $"Your order #{orderId} is being prepared.", "order", "/orders"));
+        }
+        else if (status == "Shipped")
+        {
+            if (email != null) _ = emailService.SendOrderShippedAsync(email, name, orderId);
+            if (order.UserId.HasValue) await notificationService.CreateNotificationAsync(new DTOs.CreateNotificationDto(
+                order.UserId.Value, "Order Shipped!", $"Your order #{orderId} is on its way!", "order", "/orders"));
         }
         else if (status == "Delivered")
         {
-            _ = emailService.SendOrderDeliveredAsync(user.Email, user.FullName, orderId);
-            await notificationService.CreateNotificationAsync(new DTOs.CreateNotificationDto(
-                user.Id, "Order Delivered!", $"Your order #{orderId} has been delivered. Please review!", "order", "/orders"));
+            if (email != null) _ = emailService.SendOrderDeliveredAsync(email, name, orderId);
+            if (order.UserId.HasValue) await notificationService.CreateNotificationAsync(new DTOs.CreateNotificationDto(
+                order.UserId.Value, "Order Delivered!", $"Your order #{orderId} has been delivered. Please review!", "order", "/orders"));
+
+            // Award loyalty points (1 point per ₹10 spent), once per order
+            if (!wasAlreadyDelivered && order.User != null)
+            {
+                var earned = (int)(order.TotalAmount / 10);
+                if (earned > 0)
+                {
+                    order.User.LoyaltyPoints += earned;
+                    db.LoyaltyPointTransactions.Add(new Models.LoyaltyPointTransaction
+                    {
+                        UserId = order.User.Id, Points = earned, Reason = "OrderDelivered", OrderId = orderId
+                    });
+                    await db.SaveChangesAsync();
+                }
+            }
+        }
+        else if (status == "Cancelled")
+        {
+            if (email != null) _ = emailService.SendOrderCancelledAsync(email, name, orderId);
+            if (order.UserId.HasValue) await notificationService.CreateNotificationAsync(new DTOs.CreateNotificationDto(
+                order.UserId.Value, "Order Cancelled", $"Your order #{orderId} has been cancelled.", "order", "/orders"));
         }
         return true;
     }
@@ -187,7 +219,7 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
         await db.Orders.Include(o => o.User).Include(o => o.OrderItems)
             .Where(o => o.UserId == userId).OrderByDescending(o => o.OrderDate)
             .Select(o => new AdminOrderSummaryDto(
-                o.Id, o.User.FullName, o.User.Email, o.TotalAmount,
+                o.Id, o.User != null ? o.User.FullName : (o.GuestName ?? "Guest"), o.User != null ? o.User.Email : (o.GuestEmail ?? ""), o.TotalAmount,
                 o.Status, o.OrderDate.ToString("dd MMM yyyy"), o.OrderItems.Count
             )).ToListAsync();
 }

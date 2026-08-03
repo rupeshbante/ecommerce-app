@@ -4,13 +4,14 @@ import { Router } from '@angular/router';
 import { tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { LoginRequest, RegisterRequest, AuthResponse, User, GoogleLoginRequest } from '../models/auth.models';
+import { CartService } from './cart.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly API = `${environment.apiUrl}/auth`;
   currentUser = signal<User | null>(this.getUserFromStorage());
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router, private cart: CartService) {}
 
   register(data: RegisterRequest) {
     return this.http.post<AuthResponse>(`${this.API}/register`, data).pipe(
@@ -56,6 +57,7 @@ export class AuthService {
     const user: User = { fullName: res.fullName, email: res.email, role: res.role, userId: res.userId };
     localStorage.setItem('user', JSON.stringify(user));
     this.currentUser.set(user);
+    this.cart.mergeGuestCartOnLogin();
   }
 
   private getUserFromStorage(): User | null {

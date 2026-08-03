@@ -6,7 +6,7 @@ export interface DashboardStats {
 export interface ChartData { label: string; value: number; }
 export interface TopProduct { id: number; name: string; category: string; totalSold: number; revenue: number; }
 export interface AdminOrderSummary { id: number; customerName: string; customerEmail: string; totalAmount: number; status: string; orderDate: string; itemCount: number; }
-export interface AdminOrderDetail { id: number; customerName: string; customerEmail: string; totalAmount: number; status: string; shippingAddress: string; orderDate: string; items: AdminOrderItem[]; }
+export interface AdminOrderDetail { id: number; customerName: string; customerEmail: string; totalAmount: number; status: string; shippingAddress: string; orderDate: string; items: AdminOrderItem[]; trackingNumber?: string; carrier?: string; }
 export interface AdminOrderItem { productId: number; productName: string; quantity: number; unitPrice: number; }
 export interface AdminCustomer { id: number; fullName: string; email: string; role: string; createdAt: string; totalOrders: number; totalSpent: number; }
 export interface CategoryItem { id: number; name: string; description: string; icon: string; parentId: number | null; parentName: string | null; isActive: boolean; createdAt: string; productCount: number; subCategoryCount: number; }

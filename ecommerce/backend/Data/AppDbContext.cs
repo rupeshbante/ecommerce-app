@@ -23,6 +23,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Referral> Referrals => Set<Referral>();
     public DbSet<StockNotification> StockNotifications => Set<StockNotification>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
+    public DbSet<CartItem> CartItems => Set<CartItem>();
+    public DbSet<LoyaltyPointTransaction> LoyaltyPointTransactions => Set<LoyaltyPointTransaction>();
+    public DbSet<ProductQuestion> ProductQuestions => Set<ProductQuestion>();
+    public DbSet<ProductAnswer> ProductAnswers => Set<ProductAnswer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,7 +50,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasForeignKey(c => c.ParentId).OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Order>()
-            .HasOne(o => o.User).WithMany(u => u.Orders).HasForeignKey(o => o.UserId);
+            .HasOne(o => o.User).WithMany(u => u.Orders).HasForeignKey(o => o.UserId)
+            .IsRequired(false);
 
         modelBuilder.Entity<OrderItem>()
             .HasOne(oi => oi.Order).WithMany(o => o.OrderItems).HasForeignKey(oi => oi.OrderId);
@@ -103,6 +108,42 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<Referral>()
             .HasOne(r => r.ReferredUser).WithMany().HasForeignKey(r => r.ReferredUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CartItem>()
+            .HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId);
+
+        modelBuilder.Entity<CartItem>()
+            .HasOne(c => c.Product).WithMany().HasForeignKey(c => c.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CartItem>()
+            .HasOne(c => c.Variant).WithMany().HasForeignKey(c => c.VariantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CartItem>()
+            .HasIndex(c => new { c.UserId, c.ProductId, c.VariantId }).IsUnique();
+
+        modelBuilder.Entity<Order>().Property(o => o.PointsDiscountAmount).HasColumnType("decimal(18,2)");
+
+        modelBuilder.Entity<LoyaltyPointTransaction>()
+            .HasOne(l => l.User).WithMany().HasForeignKey(l => l.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProductQuestion>()
+            .HasOne(q => q.Product).WithMany().HasForeignKey(q => q.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProductQuestion>()
+            .HasOne(q => q.User).WithMany().HasForeignKey(q => q.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProductAnswer>()
+            .HasOne(a => a.Question).WithMany(q => q.Answers).HasForeignKey(a => a.ProductQuestionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProductAnswer>()
+            .HasOne(a => a.User).WithMany().HasForeignKey(a => a.UserId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

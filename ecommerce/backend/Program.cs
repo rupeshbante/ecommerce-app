@@ -100,6 +100,9 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IReferralService, ReferralService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IStockNotificationService, StockNotificationService>();
+builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
+builder.Services.AddScoped<IProductQAService, ProductQAService>();
 
 builder.Services.AddCors(options =>
 {

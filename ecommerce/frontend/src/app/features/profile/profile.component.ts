@@ -4,9 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AddressService } from '../../core/services/address.service';
 import { ReferralService } from '../../core/services/referral.service';
+import { LoyaltyService } from '../../core/services/loyalty.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { Address, CreateAddress } from '../../core/models/address.models';
+import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.models';
 
 @Component({
   selector: 'app-profile',
@@ -27,6 +29,7 @@ import { Address, CreateAddress } from '../../core/models/address.models';
       <div class="tabs">
         <button [class.active]="tab === 'addresses'" (click)="tab='addresses'">Address Book</button>
         <button [class.active]="tab === 'referral'" (click)="tab='referral'; loadReferral()">Refer & Earn</button>
+        <button [class.active]="tab === 'loyalty'" (click)="tab='loyalty'; loadLoyalty()">Loyalty Points</button>
       </div>
 
       <!-- ADDRESS BOOK -->
@@ -151,6 +154,39 @@ import { Address, CreateAddress } from '../../core/models/address.models';
           </div>
         </div>
       </div>
+
+      <!-- LOYALTY POINTS -->
+      <div *ngIf="tab === 'loyalty'" class="referral-section">
+        <div class="ref-hero loyalty-hero">
+          <h2>Your Loyalty Points</h2>
+          <p>Earn 1 point for every ₹10 you spend. Every point delivered is worth ₹1 off your next order.</p>
+        </div>
+
+        <div class="ref-stats" *ngIf="loyaltyBalance">
+          <div class="stat-box">
+            <span class="stat-num">{{ loyaltyBalance.points }}</span>
+            <span class="stat-label">Points Balance</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num">₹{{ loyaltyBalance.valueInRupees }}</span>
+            <span class="stat-label">Redeemable Value</span>
+          </div>
+        </div>
+
+        <div class="how-it-works">
+          <h3>Recent Activity</h3>
+          <div *ngIf="loyaltyHistory.length === 0" class="empty-addr">
+            <p>No points activity yet. Place and receive an order to start earning!</p>
+          </div>
+          <div class="loyalty-row" *ngFor="let t of loyaltyHistory">
+            <div>
+              <span class="loyalty-reason">{{ t.reason === 'OrderDelivered' ? 'Earned from order' + (t.orderId ? ' #' + t.orderId : '') : 'Redeemed at checkout' + (t.orderId ? ' on order #' + t.orderId : '') }}</span>
+              <span class="loyalty-date">{{ t.createdAt | date:'dd MMM yyyy' }}</span>
+            </div>
+            <span [class]="'loyalty-points ' + (t.points >= 0 ? 'positive' : 'negative')">{{ t.points >= 0 ? '+' : '' }}{{ t.points }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
@@ -221,6 +257,14 @@ import { Address, CreateAddress } from '../../core/models/address.models';
     .step { text-align: center; }
     .step-num { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; background: #6c63ff; color: #fff; border-radius: 50%; font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem; }
     .step p { font-size: 0.875rem; color: #555; line-height: 1.6; }
+    .loyalty-hero { background: linear-gradient(135deg,#00b894,#00cec9); }
+    .loyalty-row { display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 0; border-bottom: 1px solid #f0f0f0; }
+    .loyalty-row:last-child { border-bottom: none; }
+    .loyalty-reason { display: block; font-size: 0.875rem; color: #1a1a2e; font-weight: 600; }
+    .loyalty-date { display: block; font-size: 0.75rem; color: #888; margin-top: 0.15rem; }
+    .loyalty-points { font-size: 1rem; font-weight: 800; }
+    .loyalty-points.positive { color: #00b894; }
+    .loyalty-points.negative { color: #e17055; }
   `]
 })
 export class ProfileComponent implements OnInit {
@@ -233,12 +277,15 @@ export class ProfileComponent implements OnInit {
   referralCode = '';
   refStats: any = null;
   copied = false;
+  loyaltyBalance: LoyaltyBalance | null = null;
+  loyaltyHistory: LoyaltyTransaction[] = [];
 
   form: CreateAddress = this.emptyForm();
 
   constructor(
     private addressService: AddressService,
     private referralService: ReferralService,
+    private loyaltyService: LoyaltyService,
     private auth: AuthService,
     private toasts: ToastService
   ) {}
@@ -254,6 +301,12 @@ export class ProfileComponent implements OnInit {
     if (this.referralCode) return;
     this.referralService.getMyCode().subscribe(r => this.referralCode = r.code);
     this.referralService.getStats().subscribe(s => this.refStats = s);
+  }
+
+  loadLoyalty() {
+    if (this.loyaltyBalance) return;
+    this.loyaltyService.getBalance().subscribe(b => this.loyaltyBalance = b);
+    this.loyaltyService.getHistory().subscribe(h => this.loyaltyHistory = h);
   }
 
   resetForm() { this.form = this.emptyForm(); }

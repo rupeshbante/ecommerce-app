@@ -26,12 +26,13 @@ public record AdminCustomerDto(
 public record AdminOrderDetailDto(
     int Id, string CustomerName, string CustomerEmail,
     decimal TotalAmount, string Status, string ShippingAddress,
-    string OrderDate, List<AdminOrderItemDto> Items
+    string OrderDate, List<AdminOrderItemDto> Items,
+    string? TrackingNumber = null, string? Carrier = null
 );
 
 public record AdminOrderItemDto(int ProductId, string ProductName, int Quantity, decimal UnitPrice);
 
-public record UpdateOrderStatusDto(string Status);
+public record UpdateOrderStatusDto(string Status, string? TrackingNumber = null, string? Carrier = null);
 
 public record UpdateUserRoleDto(string Role);
 

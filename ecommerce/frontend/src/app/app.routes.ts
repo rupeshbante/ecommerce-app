@@ -9,6 +9,7 @@ export const routes: Routes = [
   { path: 'cart', loadComponent: () => import('./features/cart/cart.component').then(m => m.CartComponent) },
   { path: 'orders', loadComponent: () => import('./features/orders/orders.component').then(m => m.OrdersComponent), canActivate: [authGuard] },
   { path: 'orders/success/:id', loadComponent: () => import('./features/orders/order-success/order-success.component').then(m => m.OrderSuccessComponent), canActivate: [authGuard] },
+  { path: 'orders/guest/:id', loadComponent: () => import('./features/orders/guest-order/guest-order.component').then(m => m.GuestOrderComponent) },
   { path: 'orders/:id', loadComponent: () => import('./features/orders/order-detail/order-detail.component').then(m => m.OrderDetailComponent), canActivate: [authGuard] },
   { path: 'wishlist', loadComponent: () => import('./features/wishlist/wishlist.component').then(m => m.WishlistComponent), canActivate: [authGuard] },
   { path: 'profile', loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent), canActivate: [authGuard] },

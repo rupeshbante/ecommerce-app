@@ -105,6 +105,10 @@ import { AdminOrderSummary, AdminOrderDetail } from '../../../core/models/admin.
               <select [(ngModel)]="newStatus" class="sel"><option *ngFor="let s of statusOptions" [value]="s">{{ s }}</option></select>
               <button class="btn-update" (click)="applyStatusUpdate()">Update</button>
             </div>
+            <div class="tracking-row" *ngIf="newStatus === 'Shipped' || detail.trackingNumber">
+              <input [(ngModel)]="trackingNumber" placeholder="Tracking number (optional)" class="sel">
+              <input [(ngModel)]="carrier" placeholder="Carrier e.g. BlueDart (optional)" class="sel">
+            </div>
           </div>
         </div>
       </div>
@@ -161,6 +165,7 @@ import { AdminOrderSummary, AdminOrderDetail } from '../../../core/models/admin.
     .items-table tfoot td { border-top: 2px solid #eee; padding-top: 0.75rem; }
     .total-label { text-align: right; font-weight: 700; color: #555; }
     .status-row { display: flex; gap: 0.75rem; }
+    .tracking-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; }
     .sel { padding: 0.6rem 0.85rem; border: 1.5px solid #e9ecef; border-radius: 10px; font-size: 0.875rem; outline: none; flex: 1; }
     .btn-update { background: #6c63ff; color: #fff; border: none; border-radius: 10px; padding: 0.65rem 1.25rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
     .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; padding: 1rem; font-size: 0.875rem; color: #555; border-top: 1px solid #f5f5f5; }
@@ -176,7 +181,8 @@ export class AdminOrdersComponent implements OnInit {
   Math = Math;
   private searchDebounce: any;
   newStatus = 'Pending';
-  statusOptions = ['Pending', 'Processing', 'Delivered', 'Cancelled'];
+  trackingNumber = ''; carrier = '';
+  statusOptions = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
   statuses = [
     { label: 'All', val: '' },
     { label: 'Pending', val: 'Pending' },
@@ -211,15 +217,25 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   viewDetail(id: number) {
-    this.adminService.getOrder(id).subscribe({ next: d => { this.detail = d; this.newStatus = d.status; } });
+    this.adminService.getOrder(id).subscribe({ next: d => {
+      this.detail = d;
+      this.newStatus = d.status;
+      this.trackingNumber = d.trackingNumber || '';
+      this.carrier = d.carrier || '';
+    } });
   }
 
   closeDetail() { this.detail = null; }
 
   applyStatusUpdate() {
     if (!this.detail) return;
-    this.adminService.updateOrderStatus(this.detail.id, this.newStatus).subscribe({
-      next: () => { this.detail!.status = this.newStatus; this.toasts.success('Status updated!'); this.load(); },
+    this.adminService.updateOrderStatus(this.detail.id, this.newStatus, this.trackingNumber || undefined, this.carrier || undefined).subscribe({
+      next: () => {
+        this.detail!.status = this.newStatus;
+        this.detail!.trackingNumber = this.trackingNumber || this.detail!.trackingNumber;
+        this.detail!.carrier = this.carrier || this.detail!.carrier;
+        this.toasts.success('Status updated!'); this.load();
+      },
       error: () => this.toasts.error('Failed.')
     });
   }

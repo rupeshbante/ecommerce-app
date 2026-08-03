@@ -9,6 +9,7 @@ public class User
     public string? GoogleId { get; set; }
     public string? Phone { get; set; }
     public string? ReferralCode { get; set; }
+    public int LoyaltyPoints { get; set; } = 0;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? PasswordResetToken { get; set; }
     public DateTime? PasswordResetExpiry { get; set; }

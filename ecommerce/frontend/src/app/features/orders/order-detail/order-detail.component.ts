@@ -77,6 +77,13 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
               📅 Est. delivery: {{ estimatedDelivery }}
             </span>
           </div>
+          <div class="courier-row" *ngIf="order.trackingNumber">
+            <div class="courier-info">
+              <span class="courier-label">{{ order.carrier || 'Courier' }} Tracking No.</span>
+              <span class="courier-number">{{ order.trackingNumber }}</span>
+            </div>
+            <button class="btn-copy" (click)="copyTracking()">{{ copied ? '✓ Copied' : '📋 Copy' }}</button>
+          </div>
           <div class="timeline">
             <ng-container *ngFor="let step of trackingSteps; let last = last">
               <div class="tl-item" [class.active]="step.reached" [class.current]="step.isCurrent">
@@ -132,6 +139,10 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
                 <div class="price-row discount" *ngIf="order.discountAmount && order.discountAmount > 0">
                   <span>Coupon Discount ({{ order.couponCode }})</span>
                   <span>−₹{{ order.discountAmount | number }}</span>
+                </div>
+                <div class="price-row discount" *ngIf="order.pointsDiscountAmount && order.pointsDiscountAmount > 0">
+                  <span>Loyalty Points Used ({{ order.pointsRedeemed }} pts)</span>
+                  <span>−₹{{ order.pointsDiscountAmount | number }}</span>
                 </div>
                 <div class="price-row">
                   <span>Delivery</span>
@@ -227,6 +238,11 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
     .tl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
     .tl-header h3 { margin-bottom: 0; }
     .eta-chip { font-size: 0.78rem; font-weight: 600; color: #6c63ff; background: #f0edff; padding: 0.3rem 0.75rem; border-radius: 20px; }
+    .courier-row { display: flex; justify-content: space-between; align-items: center; background: #f9f9ff; border: 1px dashed #d8d3ff; border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; }
+    .courier-info { display: flex; flex-direction: column; gap: 0.15rem; }
+    .courier-label { font-size: 0.72rem; color: #888; font-weight: 600; text-transform: uppercase; }
+    .courier-number { font-size: 0.95rem; color: #1a1a2e; font-weight: 800; letter-spacing: 0.5px; }
+    .btn-copy { background: #6c63ff; color: #fff; border: none; border-radius: 20px; padding: 0.4rem 0.9rem; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
     .timeline { display: flex; flex-direction: column; }
     .tl-item { display: flex; gap: 1rem; align-items: flex-start; }
     .tl-dot-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
@@ -301,6 +317,7 @@ export class OrderDetailComponent implements OnInit {
   order: Order | null = null;
   loading = true;
   generatingPdf = false;
+  copied = false;
 
   get subtotal() {
     if (!this.order) return 0;
@@ -340,6 +357,14 @@ export class OrderDetailComponent implements OnInit {
     this.orderService.getById(id).subscribe({
       next: o => { this.order = o; this.loading = false; },
       error: () => { this.loading = false; }
+    });
+  }
+
+  copyTracking() {
+    if (!this.order?.trackingNumber) return;
+    navigator.clipboard.writeText(this.order.trackingNumber).then(() => {
+      this.copied = true;
+      setTimeout(() => this.copied = false, 2000);
     });
   }
 
@@ -443,6 +468,8 @@ export class OrderDetailComponent implements OnInit {
     ];
     if (o.discountAmount && o.discountAmount > 0)
       summaryLines.push({ label: `Discount (${o.couponCode})`, value: `-${rs(o.discountAmount)}`, green: true });
+    if (o.pointsDiscountAmount && o.pointsDiscountAmount > 0)
+      summaryLines.push({ label: `Loyalty Points Used (${o.pointsRedeemed} pts)`, value: `-${rs(o.pointsDiscountAmount)}`, green: true });
     summaryLines.push({ label: 'Delivery', value: delivery === 0 ? 'FREE' : rs(delivery), green: delivery === 0 });
 
     summaryLines.forEach(row => {

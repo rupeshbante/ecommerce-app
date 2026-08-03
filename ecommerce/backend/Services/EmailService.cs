@@ -33,6 +33,19 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
           </div>
         </div>");
 
+    public Task SendOrderProcessingAsync(string toEmail, string userName, int orderId) =>
+        SendAsync(toEmail, $"Order #{orderId} is being prepared - ShopEase", $@"
+        <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>
+          <div style='background:linear-gradient(135deg,#1a1a2e,#6c63ff);padding:2rem;text-align:center;'>
+            <h1 style='color:#fff;margin:0;'>Your Order is Being Prepared</h1>
+          </div>
+          <div style='padding:2rem;'>
+            <p>Hi <strong>{userName}</strong>,</p>
+            <p>Your order <strong>#{orderId}</strong> is confirmed and is now being packed by our team.</p>
+            <a href='https://shopease.in/orders' style='display:inline-block;background:#6c63ff;color:#fff;text-decoration:none;padding:0.9rem 2rem;border-radius:10px;font-weight:600;margin-top:1rem;'>Track Order</a>
+          </div>
+        </div>");
+
     public Task SendOrderShippedAsync(string toEmail, string userName, int orderId) =>
         SendAsync(toEmail, $"Order #{orderId} Shipped! - ShopEase", $@"
         <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>
@@ -58,6 +71,19 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
             <p>Your order <strong>#{orderId}</strong> has been delivered. We hope you love your purchase!</p>
             <p>Please take a moment to rate your experience and help other shoppers.</p>
             <a href='https://shopease.in/orders' style='display:inline-block;background:#00b894;color:#fff;text-decoration:none;padding:0.9rem 2rem;border-radius:10px;font-weight:600;margin-top:1rem;'>Write a Review</a>
+          </div>
+        </div>");
+
+    public Task SendOrderCancelledAsync(string toEmail, string userName, int orderId) =>
+        SendAsync(toEmail, $"Order #{orderId} Cancelled - ShopEase", $@"
+        <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>
+          <div style='background:linear-gradient(135deg,#e17055,#c0392b);padding:2rem;text-align:center;'>
+            <h1 style='color:#fff;margin:0;'>Order Cancelled</h1>
+          </div>
+          <div style='padding:2rem;'>
+            <p>Hi <strong>{userName}</strong>,</p>
+            <p>Your order <strong>#{orderId}</strong> has been cancelled. If you were charged, any payment will be refunded within 5-7 business days.</p>
+            <a href='https://shopease.in/products' style='display:inline-block;background:#6c63ff;color:#fff;text-decoration:none;padding:0.9rem 2rem;border-radius:10px;font-weight:600;margin-top:1rem;'>Continue Shopping</a>
           </div>
         </div>");
 
