@@ -6,8 +6,11 @@ public record DashboardStatsDto(
     decimal SalesToday, decimal SalesThisMonth,
     List<ChartDataDto> RevenueByDay,
     List<TopProductDto> TopProducts,
-    List<AdminOrderSummaryDto> RecentOrders
+    List<AdminOrderSummaryDto> RecentOrders,
+    List<StatusCountDto> OrdersByStatus
 );
+
+public record StatusCountDto(string Status, int Count);
 
 public record ChartDataDto(string Label, decimal Value);
 
@@ -41,7 +44,8 @@ public record SalesReportDto(
     List<ChartDataDto> DailyRevenue,
     List<ChartDataDto> MonthlyRevenue,
     List<TopProductDto> TopProducts,
-    List<CategoryRevenueDto> CategoryRevenue
+    List<CategoryRevenueDto> CategoryRevenue,
+    List<StatusCountDto> OrdersByStatus
 );
 
 public record CategoryRevenueDto(string Category, decimal Revenue, int Orders);

@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AdminService } from '../../../core/services/admin.service';
 import { SalesReport } from '../../../core/models/admin.models';
+import { TrendChartComponent } from '../../../shared/charts/trend-chart.component';
+import { StatusBreakdownBarComponent } from '../../../shared/charts/status-breakdown-bar.component';
 
 @Component({
   selector: 'app-admin-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TrendChartComponent, StatusBreakdownBarComponent],
   template: `
     <div class="page-wrap">
       <div class="page-head">
@@ -39,17 +41,19 @@ import { SalesReport } from '../../../core/models/admin.models';
         <!-- Daily revenue chart -->
         <div class="chart-card">
           <h3>Daily Revenue ({{ days }} days)</h3>
-          <div class="chart-area">
-            <div class="bar-chart">
-              <div *ngFor="let d of report.dailyRevenue.slice(-30)" class="bar-group">
-                <div class="bar-tooltip">₹{{ d.value | number:'1.0-0' }}</div>
-                <div class="bar" [style.height.%]="barHeight(d.value, report.dailyRevenue)">
-                  <div class="bar-fill"></div>
-                </div>
-                <div class="bar-label" *ngIf="report.dailyRevenue.length <= 14">{{ d.label }}</div>
-              </div>
-            </div>
-          </div>
+          <app-trend-chart [data]="report.dailyRevenue" ariaLabel="Daily revenue trend"></app-trend-chart>
+        </div>
+
+        <!-- Monthly revenue chart (only meaningful once a range spans more than one month) -->
+        <div class="chart-card" *ngIf="report.monthlyRevenue.length > 1">
+          <h3>Monthly Revenue</h3>
+          <app-trend-chart [data]="report.monthlyRevenue" ariaLabel="Monthly revenue trend"></app-trend-chart>
+        </div>
+
+        <!-- Order status breakdown -->
+        <div class="chart-card">
+          <h3>Orders by Status</h3>
+          <app-status-breakdown-bar [data]="report.ordersByStatus"></app-status-breakdown-bar>
         </div>
 
         <div class="two-col">
@@ -115,14 +119,6 @@ import { SalesReport } from '../../../core/models/admin.models';
 
     .chart-card, .data-card { background: #fff; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
     .chart-card h3, .data-card h3 { font-size: 1rem; font-weight: 700; color: #1e2a38; margin-bottom: 1.25rem; }
-    .chart-area { height: 220px; overflow: hidden; }
-    .bar-chart { display: flex; align-items: flex-end; height: 100%; gap: 0.3rem; }
-    .bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; position: relative; }
-    .bar-group:hover .bar-tooltip { opacity: 1; }
-    .bar-tooltip { position: absolute; top: -26px; background: #1e2a38; color: #fff; font-size: 0.65rem; padding: 0.2rem 0.4rem; border-radius: 4px; white-space: nowrap; opacity: 0; transition: opacity 0.18s; pointer-events: none; z-index: 1; }
-    .bar { width: 100%; display: flex; align-items: flex-end; background: #f0f2f5; border-radius: 4px 4px 0 0; }
-    .bar-fill { width: 100%; height: 100%; background: linear-gradient(to top, #6c63ff, #a29bfe); border-radius: 4px 4px 0 0; min-height: 2px; }
-    .bar-label { font-size: 0.62rem; color: #888; margin-top: 0.25rem; white-space: nowrap; transform: rotate(-45deg); }
 
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 
@@ -136,7 +132,7 @@ import { SalesReport } from '../../../core/models/admin.models';
     .top-rev { font-size: 0.85rem; font-weight: 700; color: #1e2a38; }
     .top-sold { font-size: 0.7rem; color: #888; }
     .bar-mini { width: 100%; background: #f0f2f5; border-radius: 3px; height: 4px; margin-top: 0.3rem; grid-column: 1/-1; }
-    .bar-mini-fill { height: 100%; background: linear-gradient(to right, #6c63ff, #a29bfe); border-radius: 3px; }
+    .bar-mini-fill { height: 100%; background: #2a78d6; border-radius: 3px; }
 
     .cat-rev-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid #f5f5f5; }
     .cat-rev-row:last-child { border-bottom: none; }
@@ -145,7 +141,7 @@ import { SalesReport } from '../../../core/models/admin.models';
     .cr-orders { font-size: 0.72rem; color: #888; }
     .cr-bar-wrap { flex: 1; }
     .cr-bar { background: #f0f2f5; border-radius: 4px; height: 8px; }
-    .cr-bar-fill { height: 100%; background: linear-gradient(to right, #6c63ff, #a29bfe); border-radius: 4px; transition: width 0.5s ease; }
+    .cr-bar-fill { height: 100%; background: #2a78d6; border-radius: 4px; transition: width 0.5s ease; }
     .cr-rev { font-size: 0.82rem; font-weight: 700; color: #1e2a38; width: 90px; text-align: right; flex-shrink: 0; }
     .empty-msg { text-align: center; color: #888; padding: 2rem; font-size: 0.85rem; }
 
@@ -185,11 +181,6 @@ export class AdminReportsComponent implements OnInit {
       a.href = url; a.download = `products_${new Date().toISOString().slice(0,10)}.csv`; a.click();
       URL.revokeObjectURL(url);
     });
-  }
-
-  barHeight(value: number, data: any[]) {
-    const max = Math.max(...data.map(d => d.value), 1);
-    return Math.max((value / max) * 85, value > 0 ? 3 : 0);
   }
 
   catBarWidth(rev: number) {

@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
 import { DashboardStats } from '../../../core/models/admin.models';
+import { TrendChartComponent } from '../../../shared/charts/trend-chart.component';
+import { StatusBreakdownBarComponent } from '../../../shared/charts/status-breakdown-bar.component';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, TrendChartComponent, StatusBreakdownBarComponent],
   template: `
     <div class="dash-wrap">
       <div class="page-title">
@@ -79,17 +81,7 @@ import { DashboardStats } from '../../../core/models/admin.models';
             <h3>Revenue — Last 7 Days</h3>
             <a routerLink="/admin/reports" class="view-all">Full Report →</a>
           </div>
-          <div class="chart-area">
-            <div class="bar-chart">
-              <div *ngFor="let d of stats.revenueByDay" class="bar-group">
-                <div class="bar-tooltip">₹{{ d.value | number:'1.0-0' }}</div>
-                <div class="bar" [style.height.%]="barHeight(d.value)">
-                  <div class="bar-fill"></div>
-                </div>
-                <div class="bar-label">{{ d.label }}</div>
-              </div>
-            </div>
-          </div>
+          <app-trend-chart [data]="stats.revenueByDay" ariaLabel="Revenue over the last 7 days"></app-trend-chart>
         </div>
 
         <!-- Top products -->
@@ -111,6 +103,14 @@ import { DashboardStats } from '../../../core/models/admin.models';
           </div>
           <div *ngIf="stats.topProducts.length === 0" class="empty-msg">No sales data yet</div>
         </div>
+      </div>
+
+      <!-- Order status breakdown -->
+      <div class="chart-card" *ngIf="stats">
+        <div class="card-head">
+          <h3>Orders by Status</h3>
+        </div>
+        <app-status-breakdown-bar [data]="stats.ordersByStatus"></app-status-breakdown-bar>
       </div>
 
       <!-- Recent orders -->
@@ -180,15 +180,6 @@ import { DashboardStats } from '../../../core/models/admin.models';
     .view-all { font-size: 0.82rem; color: #6c63ff; text-decoration: none; font-weight: 600; }
     .view-all:hover { text-decoration: underline; }
 
-    .chart-area { height: 200px; }
-    .bar-chart { display: flex; align-items: flex-end; height: 100%; gap: 0.5rem; padding: 0 0.5rem; }
-    .bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; position: relative; }
-    .bar-group:hover .bar-tooltip { opacity: 1; }
-    .bar-tooltip { position: absolute; top: -28px; background: #1e2a38; color: #fff; font-size: 0.68rem; padding: 0.2rem 0.4rem; border-radius: 4px; white-space: nowrap; opacity: 0; transition: opacity 0.18s; pointer-events: none; }
-    .bar { width: 100%; max-width: 40px; display: flex; align-items: flex-end; background: #f0f2f5; border-radius: 6px 6px 0 0; }
-    .bar-fill { width: 100%; height: 100%; background: linear-gradient(to top, #6c63ff, #a29bfe); border-radius: 6px 6px 0 0; min-height: 4px; }
-    .bar-label { font-size: 0.68rem; color: #888; margin-top: 0.3rem; white-space: nowrap; }
-
     /* Top products */
     .top-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.7rem 0; border-bottom: 1px solid #f5f5f5; }
     .top-row:last-child { border-bottom: none; }
@@ -241,11 +232,5 @@ export class AdminDashboardComponent implements OnInit {
       next: s => { this.stats = s; this.loading = false; },
       error: () => this.loading = false
     });
-  }
-
-  barHeight(value: number): number {
-    if (!this.stats) return 0;
-    const max = Math.max(...this.stats.revenueByDay.map(d => d.value), 1);
-    return Math.max((value / max) * 90, value > 0 ? 5 : 0);
   }
 }

@@ -56,8 +56,12 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
             ))
             .ToListAsync();
 
+        var ordersByStatus = await db.Orders.GroupBy(o => o.Status)
+            .Select(g => new StatusCountDto(g.Key, g.Count()))
+            .ToListAsync();
+
         return new DashboardStatsDto(totalOrders, totalSales, totalCustomers, totalProducts,
-            pendingOrders, lowStock, salesToday, salesMonth, revenueByDay, topProducts, recentOrders);
+            pendingOrders, lowStock, salesToday, salesMonth, revenueByDay, topProducts, recentOrders, ordersByStatus);
     }
 
     public async Task<SalesReportDto> GetSalesReportAsync(int days)
@@ -92,9 +96,13 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
 
         var totalCustomers = await db.Users.CountAsync(u => u.Role == "Customer");
 
+        var ordersByStatus = orders.GroupBy(o => o.Status)
+            .Select(g => new StatusCountDto(g.Key, g.Count()))
+            .ToList();
+
         return new SalesReportDto(orders.Sum(o => o.TotalAmount), orders.Count,
             totalCustomers, await db.Products.CountAsync(p => p.IsActive),
-            daily, monthly, topProducts, catRevenue);
+            daily, monthly, topProducts, catRevenue, ordersByStatus);
     }
 
     public async Task<List<AdminCustomerDto>> GetAllCustomersAsync() =>
