@@ -27,6 +27,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<LoyaltyPointTransaction> LoyaltyPointTransactions => Set<LoyaltyPointTransaction>();
     public DbSet<ProductQuestion> ProductQuestions => Set<ProductQuestion>();
     public DbSet<ProductAnswer> ProductAnswers => Set<ProductAnswer>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -145,5 +146,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<ProductAnswer>()
             .HasOne(a => a.User).WithMany().HasForeignKey(a => a.UserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ChatMessage>()
+            .HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId);
     }
 }

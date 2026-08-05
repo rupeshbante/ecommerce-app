@@ -13,11 +13,12 @@ import { ComparisonService } from './core/services/comparison.service';
 import { ThemeService } from './core/services/theme.service';
 import { ProductService } from './core/services/product.service';
 import { Product } from './core/models/product.models';
+import { ChatWidgetComponent } from './shared/chat-widget/chat-widget.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, FormsModule, ChatWidgetComponent],
   template: `
     <nav class="navbar">
       <div class="nav-wrap">
@@ -135,6 +136,8 @@ import { Product } from './core/models/product.models';
         </div>
       </div>
     </div>
+
+    <app-chat-widget *ngIf="auth.isLoggedIn()"></app-chat-widget>
 
     <div class="toast-stack">
       <div *ngFor="let t of toasts.toasts()" [class]="'toast toast-' + t.type" (click)="toasts.dismiss(t.id)">
