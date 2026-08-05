@@ -103,7 +103,7 @@ builder.Services.AddScoped<IStockNotificationService, StockNotificationService>(
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 builder.Services.AddScoped<IProductQAService, ProductQAService>();
-builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddHttpClient<IChatService, ChatService>();
 
 builder.Services.AddCors(options =>
 {

@@ -1,5 +1,5 @@
-using Anthropic;
-using Anthropic.Models.Messages;
+using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using ECommerceAPI.Data;
 using ECommerceAPI.DTOs;
@@ -7,9 +7,10 @@ using ECommerceAPI.Models;
 
 namespace ECommerceAPI.Services;
 
-public class ChatService(AppDbContext db, IConfiguration config, ILogger<ChatService> logger) : IChatService
+public class ChatService(AppDbContext db, HttpClient http, IConfiguration config, ILogger<ChatService> logger) : IChatService
 {
-    private readonly string _apiKey = config["Anthropic:ApiKey"] ?? "";
+    private readonly string _apiKey = config["Gemini:ApiKey"] ?? "";
+    private readonly string _model = config["Gemini:Model"] ?? "gemini-2.0-flash";
 
     private const string SystemPrompt = @"You are ShopEase's customer support assistant. ShopEase is an online store selling a wide range of products.
 
@@ -27,7 +28,7 @@ Be friendly and concise. Never invent specific facts you don't have access to (l
     {
         if (string.IsNullOrEmpty(_apiKey))
         {
-            logger.LogInformation("Anthropic API not configured. Would reply to user {UserId}", userId);
+            logger.LogInformation("Gemini API not configured. Would reply to user {UserId}", userId);
             return await PersistExchangeAsync(userId, userMessage,
                 "Chat support isn't set up yet — please email support@shopease.in and our team will help you out.");
         }
@@ -41,32 +42,39 @@ Be friendly and concise. Never invent specific facts you don't have access to (l
                 .ToListAsync();
             history.Reverse();
 
-            var messages = history
-                .Select(m => new MessageParam
+            var contents = history
+                .Select(m => new
                 {
-                    Role = m.Role == "assistant" ? Role.Assistant : Role.User,
-                    Content = m.Content
+                    role = m.Role == "assistant" ? "model" : "user",
+                    parts = new[] { new { text = m.Content } }
                 })
                 .ToList();
-            messages.Add(new MessageParam { Role = Role.User, Content = userMessage });
+            contents.Add(new { role = "user", parts = new[] { new { text = userMessage } } });
 
-            var client = new AnthropicClient { ApiKey = _apiKey };
-            var parameters = new MessageCreateParams
+            var payload = new
             {
-                Model = Model.ClaudeOpus5,
-                MaxTokens = 1024,
-                System = SystemPrompt,
-                Messages = messages
+                system_instruction = new { parts = new[] { new { text = SystemPrompt } } },
+                contents,
+                generationConfig = new { maxOutputTokens = 1024 }
             };
 
-            var response = await client.Messages.Create(parameters);
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"https://generativelanguage.googleapis.com/v1beta/models/{_model}:generateContent");
+            request.Headers.Add("x-goog-api-key", _apiKey);
+            request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            var replyText = "";
-            foreach (var block in response.Content)
+            var response = await http.SendAsync(request);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
             {
-                if (block.TryPickText(out var textBlock))
-                    replyText += textBlock.Text;
+                logger.LogError("Gemini API error {Status}: {Body}", response.StatusCode, responseBody);
+                return await PersistExchangeAsync(userId, userMessage,
+                    "Something went wrong on our end — please try again in a moment.");
             }
+
+            var replyText = ExtractReplyText(responseBody);
             if (string.IsNullOrWhiteSpace(replyText))
                 replyText = "Sorry, I didn't quite catch that — could you rephrase?";
 
@@ -74,10 +82,29 @@ Be friendly and concise. Never invent specific facts you don't have access to (l
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Anthropic chat call failed for user {UserId}", userId);
+            logger.LogError(ex, "Gemini chat call failed for user {UserId}", userId);
             return await PersistExchangeAsync(userId, userMessage,
                 "Something went wrong on our end — please try again in a moment.");
         }
+    }
+
+    private static string ExtractReplyText(string responseBody)
+    {
+        using var doc = JsonDocument.Parse(responseBody);
+        if (!doc.RootElement.TryGetProperty("candidates", out var candidates) || candidates.GetArrayLength() == 0)
+            return "";
+
+        var sb = new StringBuilder();
+        var content = candidates[0].GetProperty("content");
+        if (content.TryGetProperty("parts", out var parts))
+        {
+            foreach (var part in parts.EnumerateArray())
+            {
+                if (part.TryGetProperty("text", out var textEl))
+                    sb.Append(textEl.GetString());
+            }
+        }
+        return sb.ToString();
     }
 
     private async Task<ChatMessageDto> PersistExchangeAsync(int userId, string userMessage, string reply)
