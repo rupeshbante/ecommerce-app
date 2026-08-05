@@ -10,7 +10,7 @@ namespace ECommerceAPI.Services;
 public class ChatService(AppDbContext db, HttpClient http, IConfiguration config, ILogger<ChatService> logger) : IChatService
 {
     private readonly string _apiKey = config["Gemini:ApiKey"] ?? "";
-    private readonly string _model = config["Gemini:Model"] ?? "gemini-2.0-flash";
+    private readonly string _model = config["Gemini:Model"] ?? "gemini-flash-latest";
 
     private const string SystemPrompt = @"You are ShopEase's customer support assistant. ShopEase is an online store selling a wide range of products.
 
