@@ -1,6 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -8,7 +8,7 @@ import { ToastService } from '../../../core/services/toast.service';
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink],
   template: `
     <div class="auth-page">
       <div class="auth-left">
@@ -32,7 +32,7 @@ import { ToastService } from '../../../core/services/toast.service';
             <p>Don't have an account? <a routerLink="/auth/register">Create one free →</a></p>
           </div>
 
-          <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+          <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate *ngIf="!otpStep">
             <div class="field-group">
               <label for="email">Email Address</label>
               <div class="input-wrap" [class.has-error]="form.get('email')?.invalid && form.get('email')?.touched">
@@ -73,8 +73,36 @@ import { ToastService } from '../../../core/services/toast.service';
             </button>
           </form>
 
-          <div class="divider"><span>or continue with</span></div>
-          <div class="social-btns">
+          <!-- OTP step -->
+          <form (ngSubmit)="verifyOtp()" novalidate *ngIf="otpStep">
+            <p class="otp-hint">We've sent a 6-digit code to <strong>{{ otpEmail }}</strong>. It expires in 5 minutes.</p>
+            <div class="field-group">
+              <label for="otp">Login Code</label>
+              <div class="input-wrap">
+                <input id="otp" [(ngModel)]="otpCode" name="otpCode" placeholder="123456" maxlength="6" inputmode="numeric" class="otp-input" autocomplete="one-time-code">
+              </div>
+            </div>
+
+            <div *ngIf="error" class="error-banner">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {{ error }}
+            </div>
+
+            <button type="submit" class="btn-submit" [disabled]="otpCode.length !== 6 || loading">
+              <span *ngIf="!loading">Verify &amp; Sign In →</span>
+              <span *ngIf="loading" class="spin-wrap"><span class="spinner"></span> Verifying...</span>
+            </button>
+
+            <div class="otp-actions">
+              <button type="button" class="link-btn" [disabled]="resendCooldown > 0" (click)="resendCode()">
+                {{ resendCooldown > 0 ? 'Resend code (' + resendCooldown + 's)' : 'Resend code' }}
+              </button>
+              <button type="button" class="link-btn" (click)="otpStep = false; error = ''">← Back to login</button>
+            </div>
+          </form>
+
+          <div class="divider" *ngIf="!otpStep"><span>or continue with</span></div>
+          <div class="social-btns" *ngIf="!otpStep">
             <button class="social-btn" (click)="loginWithGoogle()">
               <svg class="google-icon" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 2.9l5.7-5.7C34.5 6.6 29.5 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.4 18.9 12 24 12c3.1 0 5.8 1.1 8 2.9l5.7-5.7C34.5 6.6 29.5 4 24 4c-7.7 0-14.4 4.4-17.7 10.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.1 35.4 26.6 36 24 36c-5.2 0-9.7-3.3-11.4-8l-6.5 5C9.5 39.4 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.3 5.5l6.2 5.2C37 37.3 44 32 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
               Continue with Google
@@ -147,6 +175,12 @@ import { ToastService } from '../../../core/services/toast.service';
     .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    .otp-hint { font-size: 0.875rem; color: #555; margin-bottom: 1.25rem; line-height: 1.6; }
+    .otp-input { letter-spacing: 6px; font-size: 1.2rem; font-weight: 700; text-align: center; padding-left: 0.85rem !important; }
+    .otp-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; }
+    .link-btn { background: none; border: none; color: #6c63ff; font-size: 0.82rem; font-weight: 600; cursor: pointer; padding: 0; }
+    .link-btn:disabled { color: #bbb; cursor: not-allowed; }
+
     .divider { display: flex; align-items: center; gap: 1rem; margin: 1.5rem 0; color: #ccc; font-size: 0.8rem; }
     .divider::before, .divider::after { content: ''; flex: 1; border-top: 1px solid #e9ecef; }
     .social-btns { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
@@ -162,12 +196,18 @@ import { ToastService } from '../../../core/services/toast.service';
     }
   `]
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, OnDestroy {
   form!: FormGroup;
   error = '';
   loading = false;
   showPw = false;
   sessionExpired = false;
+
+  otpStep = false;
+  otpEmail = '';
+  otpCode = '';
+  resendCooldown = 0;
+  private cooldownTimer: any;
 
   constructor(
     private fb: FormBuilder,
@@ -191,14 +231,58 @@ export class LoginComponent implements OnInit {
     });
   }
 
+  ngOnDestroy() {
+    clearInterval(this.cooldownTimer);
+  }
+
   onSubmit() {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
     this.loading = true;
     this.error = '';
     this.auth.login(this.form.value as any).subscribe({
-      next: () => { this.toasts.success('Welcome back! 👋'); this.router.navigate(['/products']); },
+      next: res => {
+        this.loading = false;
+        if (res.requiresOtp) {
+          this.otpStep = true;
+          this.otpEmail = res.email || this.form.value.email;
+          this.otpCode = '';
+          this.startCooldown();
+          this.toasts.info('Enter the code we emailed you to finish signing in.');
+        } else {
+          this.toasts.success('Welcome back! 👋');
+          this.router.navigate(['/products']);
+        }
+      },
       error: () => { this.error = 'Invalid email or password. Please try again.'; this.loading = false; }
     });
+  }
+
+  verifyOtp() {
+    if (this.otpCode.length !== 6) return;
+    this.loading = true;
+    this.error = '';
+    this.auth.verifyOtp(this.otpEmail, this.otpCode).subscribe({
+      next: () => { this.toasts.success('Welcome back! 👋'); this.router.navigate(['/products']); },
+      error: (err) => {
+        this.error = err.error?.message || 'Invalid or expired code.';
+        this.loading = false;
+      }
+    });
+  }
+
+  resendCode() {
+    if (this.resendCooldown > 0) return;
+    this.auth.resendOtp(this.otpEmail).subscribe(() => this.toasts.info('A new code has been sent.'));
+    this.startCooldown();
+  }
+
+  private startCooldown() {
+    this.resendCooldown = 30;
+    clearInterval(this.cooldownTimer);
+    this.cooldownTimer = setInterval(() => {
+      this.resendCooldown--;
+      if (this.resendCooldown <= 0) clearInterval(this.cooldownTimer);
+    }, 1000);
   }
 
   loginWithGoogle() {

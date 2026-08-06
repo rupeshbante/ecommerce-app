@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { LoginRequest, RegisterRequest, AuthResponse, User, GoogleLoginRequest } from '../models/auth.models';
+import { LoginRequest, RegisterRequest, AuthResponse, LoginResponse, User, GoogleLoginRequest } from '../models/auth.models';
 import { CartService } from './cart.service';
 
 @Injectable({ providedIn: 'root' })
@@ -20,9 +20,27 @@ export class AuthService {
   }
 
   login(data: LoginRequest) {
-    return this.http.post<AuthResponse>(`${this.API}/login`, data).pipe(
+    return this.http.post<LoginResponse>(`${this.API}/login`, data).pipe(
+      tap(res => { if (!res.requiresOtp) this.storeAuth(res as AuthResponse); })
+    );
+  }
+
+  verifyOtp(email: string, code: string) {
+    return this.http.post<AuthResponse>(`${this.API}/verify-otp`, { email, code }).pipe(
       tap(res => this.storeAuth(res))
     );
+  }
+
+  resendOtp(email: string) {
+    return this.http.post<{ message: string }>(`${this.API}/resend-otp`, { email });
+  }
+
+  getTwoFactorStatus() {
+    return this.http.get<{ enabled: boolean }>(`${this.API}/2fa`);
+  }
+
+  setTwoFactor(enabled: boolean) {
+    return this.http.put<{ enabled: boolean }>(`${this.API}/2fa`, { enabled });
   }
 
   logout() {

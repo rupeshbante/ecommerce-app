@@ -12,4 +12,5 @@ public interface IEmailService
     Task SendLowStockAlertAsync(string adminEmail, string productName, int currentStock);
     Task SendPasswordResetAsync(string toEmail, string userName, string resetLink);
     Task SendBackInStockAsync(string toEmail, string userName, string productName, int productId);
+    Task SendOtpAsync(string toEmail, string userName, string code);
 }

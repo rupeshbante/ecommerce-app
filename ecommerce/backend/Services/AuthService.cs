@@ -41,11 +41,59 @@ public class AuthService(AppDbContext db, IConfiguration config, IEmailService e
         return new AuthResponseDto(GenerateToken(user), user.FullName, user.Email, user.Role, user.Id);
     }
 
-    public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
+    public async Task<LoginResponseDto?> LoginAsync(LoginDto dto)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash)) return null;
+
+        if (user.TwoFactorEnabled)
+        {
+            await GenerateAndSendOtpAsync(user);
+            return new LoginResponseDto(true, Email: user.Email);
+        }
+
+        return new LoginResponseDto(false, GenerateToken(user), user.FullName, user.Email, user.Role, user.Id);
+    }
+
+    public async Task<AuthResponseDto?> VerifyOtpAsync(string email, string code)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u =>
+            u.Email == email && u.OtpCode == code && u.OtpExpiry > DateTime.UtcNow);
+        if (user == null) return null;
+
+        user.OtpCode = null;
+        user.OtpExpiry = null;
+        await db.SaveChangesAsync();
         return new AuthResponseDto(GenerateToken(user), user.FullName, user.Email, user.Role, user.Id);
+    }
+
+    public async Task ResendOtpAsync(string email)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email && u.TwoFactorEnabled);
+        if (user == null) return; // don't reveal whether the email exists
+        await GenerateAndSendOtpAsync(user);
+    }
+
+    public async Task<bool> SetTwoFactorAsync(int userId, bool enabled)
+    {
+        var user = await db.Users.FindAsync(userId);
+        if (user == null) return false;
+        user.TwoFactorEnabled = enabled;
+        if (!enabled) { user.OtpCode = null; user.OtpExpiry = null; }
+        await db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> GetTwoFactorStatusAsync(int userId) =>
+        (await db.Users.FindAsync(userId))?.TwoFactorEnabled ?? false;
+
+    private async Task GenerateAndSendOtpAsync(User user)
+    {
+        var code = Random.Shared.Next(100000, 999999).ToString();
+        user.OtpCode = code;
+        user.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
+        await db.SaveChangesAsync();
+        _ = emailService.SendOtpAsync(user.Email, user.FullName, code);
     }
 
     public async Task<AuthResponseDto?> GoogleLoginAsync(string googleId, string email, string fullName)

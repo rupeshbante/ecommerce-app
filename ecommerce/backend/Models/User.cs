@@ -13,6 +13,9 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? PasswordResetToken { get; set; }
     public DateTime? PasswordResetExpiry { get; set; }
+    public bool TwoFactorEnabled { get; set; } = false;
+    public string? OtpCode { get; set; }
+    public DateTime? OtpExpiry { get; set; }
     public ICollection<Order> Orders { get; set; } = new List<Order>();
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
     public ICollection<WishlistItem> WishlistItems { get; set; } = new List<WishlistItem>();

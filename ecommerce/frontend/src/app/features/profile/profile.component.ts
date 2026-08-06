@@ -30,6 +30,7 @@ import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.mo
         <button [class.active]="tab === 'addresses'" (click)="tab='addresses'">Address Book</button>
         <button [class.active]="tab === 'referral'" (click)="tab='referral'; loadReferral()">Refer & Earn</button>
         <button [class.active]="tab === 'loyalty'" (click)="tab='loyalty'; loadLoyalty()">Loyalty Points</button>
+        <button [class.active]="tab === 'security'" (click)="tab='security'; loadSecurity()">Security</button>
       </div>
 
       <!-- ADDRESS BOOK -->
@@ -197,6 +198,23 @@ import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.mo
           </div>
         </div>
       </div>
+
+      <!-- SECURITY -->
+      <div *ngIf="tab === 'security'" class="security-section">
+        <div class="sec-card">
+          <div class="sec-info">
+            <h3>Two-Factor Authentication</h3>
+            <p>Add an extra layer of security. When enabled, we'll email you a 6-digit code to enter every time you sign in.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" [checked]="twoFactorEnabled" [disabled]="loadingSecurity" (change)="toggleTwoFactor($any($event.target).checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <p class="sec-status" *ngIf="!loadingSecurity">
+          {{ twoFactorEnabled ? '✅ Two-factor authentication is ON.' : 'Two-factor authentication is currently OFF.' }}
+        </p>
+      </div>
     </div>
   `,
   styles: [`
@@ -247,6 +265,19 @@ import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.mo
     .empty-addr { background: #fff; border-radius: 14px; padding: 2rem; text-align: center; color: #888; }
 
     .referral-section { }
+
+    .security-section { display: flex; flex-direction: column; gap: 1rem; max-width: 640px; }
+    .sec-card { background: #fff; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; }
+    .sec-info h3 { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin-bottom: 0.4rem; }
+    .sec-info p { font-size: 0.85rem; color: #888; line-height: 1.6; }
+    .sec-status { font-size: 0.85rem; color: #555; padding: 0 0.25rem; }
+    .switch { position: relative; display: inline-block; width: 48px; height: 26px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 26px; transition: 0.2s; }
+    .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+    .switch input:checked + .slider { background: #6c63ff; }
+    .switch input:checked + .slider:before { transform: translateX(22px); }
+    .switch input:disabled + .slider { opacity: 0.6; cursor: not-allowed; }
     .ref-hero { background: linear-gradient(135deg,#6c63ff,#a29bfe); border-radius: 20px; padding: 2.5rem; color: #fff; margin-bottom: 2rem; }
     .ref-hero h2 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.75rem; }
     .ref-hero p { opacity: 0.85; line-height: 1.6; }
@@ -292,6 +323,9 @@ export class ProfileComponent implements OnInit {
   applyingCode = false;
   loyaltyBalance: LoyaltyBalance | null = null;
   loyaltyHistory: LoyaltyTransaction[] = [];
+  twoFactorEnabled = false;
+  loadingSecurity = true;
+  securityLoaded = false;
 
   form: CreateAddress = this.emptyForm();
 
@@ -339,6 +373,30 @@ export class ProfileComponent implements OnInit {
     if (this.loyaltyBalance) return;
     this.loyaltyService.getBalance().subscribe(b => this.loyaltyBalance = b);
     this.loyaltyService.getHistory().subscribe(h => this.loyaltyHistory = h);
+  }
+
+  loadSecurity() {
+    if (this.securityLoaded) return;
+    this.loadingSecurity = true;
+    this.auth.getTwoFactorStatus().subscribe({
+      next: res => { this.twoFactorEnabled = res.enabled; this.loadingSecurity = false; this.securityLoaded = true; },
+      error: () => this.loadingSecurity = false
+    });
+  }
+
+  toggleTwoFactor(enabled: boolean) {
+    this.loadingSecurity = true;
+    this.auth.setTwoFactor(enabled).subscribe({
+      next: res => {
+        this.twoFactorEnabled = res.enabled;
+        this.loadingSecurity = false;
+        this.toasts.success(enabled ? 'Two-factor authentication enabled.' : 'Two-factor authentication disabled.');
+      },
+      error: () => {
+        this.loadingSecurity = false;
+        this.toasts.error('Failed to update two-factor authentication.');
+      }
+    });
   }
 
   resetForm() { this.form = this.emptyForm(); }

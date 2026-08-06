@@ -162,6 +162,26 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
           </div>
         </div>");
 
+    public Task SendOtpAsync(string toEmail, string userName, string code) =>
+        SendAsync(toEmail, $"Your ShopEase login code: {code}", $@"
+        <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>
+          <div style='background:linear-gradient(135deg,#1a1a2e,#6c63ff);padding:2rem;text-align:center;'>
+            <h1 style='color:#fff;margin:0;'>Your Login Code</h1>
+            <p style='color:rgba(255,255,255,0.8);margin:0.5rem 0 0;'>ShopEase Account Security</p>
+          </div>
+          <div style='padding:2rem;'>
+            <p>Hi <strong>{userName}</strong>,</p>
+            <p style='color:#555;'>Use this code to complete your sign-in:</p>
+            <div style='text-align:center;margin:2rem 0;'>
+              <span style='display:inline-block;background:#f5f3ff;color:#6c63ff;letter-spacing:6px;font-size:1.8rem;font-weight:800;padding:1rem 1.5rem;border-radius:12px;'>{code}</span>
+            </div>
+            <p style='color:#888;font-size:0.85rem;'>This code expires in <strong>5 minutes</strong>. If you didn't try to sign in, you can safely ignore this email.</p>
+          </div>
+          <div style='background:#f7f8fc;padding:1rem 2rem;text-align:center;font-size:0.8rem;color:#888;'>
+            ShopEase Pvt. Ltd. | support@shopease.in
+          </div>
+        </div>");
+
     private async Task SendAsync(string to, string subject, string htmlBody)
     {
         if (string.IsNullOrEmpty(_user))
