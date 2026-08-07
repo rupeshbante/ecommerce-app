@@ -148,6 +148,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<ChatMessage>()
-            .HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId);
+            .HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId)
+            .IsRequired(false);
     }
 }

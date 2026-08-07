@@ -4,6 +4,6 @@ namespace ECommerceAPI.Services;
 
 public interface IChatService
 {
-    Task<ChatMessageDto> SendMessageAsync(int userId, string userMessage);
-    Task<List<ChatMessageDto>> GetHistoryAsync(int userId);
+    Task<ChatMessageDto> SendMessageAsync(int? userId, string? guestSessionId, string userMessage);
+    Task<List<ChatMessageDto>> GetHistoryAsync(int? userId, string? guestSessionId);
 }

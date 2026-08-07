@@ -137,7 +137,7 @@ import { ChatWidgetComponent } from './shared/chat-widget/chat-widget.component'
       </div>
     </div>
 
-    <app-chat-widget *ngIf="auth.isLoggedIn()"></app-chat-widget>
+    <app-chat-widget></app-chat-widget>
 
     <div class="toast-stack">
       <div *ngFor="let t of toasts.toasts()" [class]="'toast toast-' + t.type" (click)="toasts.dismiss(t.id)">

@@ -24,19 +24,19 @@ You know about these ShopEase features and policies:
 
 Be friendly and concise. Never invent specific facts you don't have access to (like a specific order's exact status, live stock levels, or exact prices) — instead point the customer to the relevant page (My Orders, Returns, Profile, the product page). If asked something unrelated to ShopEase or shopping, politely redirect the conversation back to how you can help with their shopping experience.";
 
-    public async Task<ChatMessageDto> SendMessageAsync(int userId, string userMessage)
+    public async Task<ChatMessageDto> SendMessageAsync(int? userId, string? guestSessionId, string userMessage)
     {
         if (string.IsNullOrEmpty(_apiKey))
         {
             logger.LogInformation("Gemini API not configured. Would reply to user {UserId}", userId);
-            return await PersistExchangeAsync(userId, userMessage,
+            return await PersistExchangeAsync(userId, guestSessionId, userMessage,
                 "Chat support isn't set up yet — please email support@shopease.in and our team will help you out.");
         }
 
         try
         {
             var history = await db.ChatMessages
-                .Where(c => c.UserId == userId)
+                .Where(c => userId.HasValue ? c.UserId == userId : c.GuestSessionId == guestSessionId)
                 .OrderByDescending(c => c.CreatedAt)
                 .Take(20)
                 .ToListAsync();
@@ -70,7 +70,7 @@ Be friendly and concise. Never invent specific facts you don't have access to (l
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogError("Gemini API error {Status}: {Body}", response.StatusCode, responseBody);
-                return await PersistExchangeAsync(userId, userMessage,
+                return await PersistExchangeAsync(userId, guestSessionId, userMessage,
                     "Something went wrong on our end — please try again in a moment.");
             }
 
@@ -78,12 +78,12 @@ Be friendly and concise. Never invent specific facts you don't have access to (l
             if (string.IsNullOrWhiteSpace(replyText))
                 replyText = "Sorry, I didn't quite catch that — could you rephrase?";
 
-            return await PersistExchangeAsync(userId, userMessage, replyText);
+            return await PersistExchangeAsync(userId, guestSessionId, userMessage, replyText);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Gemini chat call failed for user {UserId}", userId);
-            return await PersistExchangeAsync(userId, userMessage,
+            return await PersistExchangeAsync(userId, guestSessionId, userMessage,
                 "Something went wrong on our end — please try again in a moment.");
         }
     }
@@ -107,18 +107,18 @@ Be friendly and concise. Never invent specific facts you don't have access to (l
         return sb.ToString();
     }
 
-    private async Task<ChatMessageDto> PersistExchangeAsync(int userId, string userMessage, string reply)
+    private async Task<ChatMessageDto> PersistExchangeAsync(int? userId, string? guestSessionId, string userMessage, string reply)
     {
-        db.ChatMessages.Add(new ChatMessage { UserId = userId, Role = "user", Content = userMessage });
-        var assistantMessage = new ChatMessage { UserId = userId, Role = "assistant", Content = reply };
+        db.ChatMessages.Add(new ChatMessage { UserId = userId, GuestSessionId = userId.HasValue ? null : guestSessionId, Role = "user", Content = userMessage });
+        var assistantMessage = new ChatMessage { UserId = userId, GuestSessionId = userId.HasValue ? null : guestSessionId, Role = "assistant", Content = reply };
         db.ChatMessages.Add(assistantMessage);
         await db.SaveChangesAsync();
 
         return new ChatMessageDto(assistantMessage.Id, assistantMessage.Role, assistantMessage.Content, assistantMessage.CreatedAt);
     }
 
-    public async Task<List<ChatMessageDto>> GetHistoryAsync(int userId) =>
-        await db.ChatMessages.Where(c => c.UserId == userId)
+    public async Task<List<ChatMessageDto>> GetHistoryAsync(int? userId, string? guestSessionId) =>
+        await db.ChatMessages.Where(c => userId.HasValue ? c.UserId == userId : c.GuestSessionId == guestSessionId)
             .OrderBy(c => c.CreatedAt).Take(50)
             .Select(c => new ChatMessageDto(c.Id, c.Role, c.Content, c.CreatedAt))
             .ToListAsync();
