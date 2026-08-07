@@ -128,7 +128,30 @@ import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.mo
             <span class="code">{{ referralCode }}</span>
             <button class="btn-copy" (click)="copyCode()">{{ copied ? 'Copied!' : 'Copy' }}</button>
           </div>
-          <p class="share-text">Share link: shopease.in/register?ref={{ referralCode }}</p>
+
+          <span class="code-label">Shareable Link</span>
+          <div class="code-box">
+            <span class="share-link">{{ shareLink }}</span>
+            <button class="btn-copy" (click)="copyLink()">{{ linkCopied ? 'Copied!' : 'Copy Link' }}</button>
+          </div>
+
+          <div class="share-row">
+            <button class="share-btn share-whatsapp" (click)="shareViaWhatsApp()">
+              <span>💬</span> WhatsApp
+            </button>
+            <button class="share-btn share-twitter" (click)="shareViaTwitter()">
+              <span>𝕏</span> Twitter
+            </button>
+            <button class="share-btn share-facebook" (click)="shareViaFacebook()">
+              <span>📘</span> Facebook
+            </button>
+            <button class="share-btn share-email" (click)="shareViaEmail()">
+              <span>✉️</span> Email
+            </button>
+            <button class="share-btn share-native" *ngIf="canNativeShare" (click)="shareNative()">
+              <span>📤</span> More
+            </button>
+          </div>
         </div>
 
         <div class="ref-code-card">
@@ -288,6 +311,15 @@ import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.mo
     .btn-copy { background: #6c63ff; color: #fff; border: none; border-radius: 8px; padding: 0.5rem 1.25rem; font-weight: 600; cursor: pointer; transition: background 0.18s; }
     .btn-copy:hover { background: #5a52d5; }
     .share-text { font-size: 0.8rem; color: #888; }
+    .share-link { font-size: 0.82rem; color: #555; flex: 1; overflow-x: auto; white-space: nowrap; }
+    .share-row { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .share-btn { display: inline-flex; align-items: center; gap: 0.4rem; border: none; border-radius: 10px; padding: 0.55rem 1rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: opacity 0.18s, transform 0.18s; }
+    .share-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+    .share-whatsapp { background: #e7f9ee; color: #1e9e56; }
+    .share-twitter { background: #eef4fb; color: #1a1a2e; }
+    .share-facebook { background: #e8f0fe; color: #1877f2; }
+    .share-email { background: #f0edff; color: #6c63ff; }
+    .share-native { background: #f7f8fc; color: #555; border: 1.5px solid #e9ecef; }
     .apply-code-input { flex: 1; border: none; background: transparent; font-size: 0.95rem; font-weight: 600; color: #1a1a2e; outline: none; }
     .ref-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 2rem; }
     .stat-box { background: #fff; border-radius: 14px; padding: 1.25rem; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
@@ -319,6 +351,8 @@ export class ProfileComponent implements OnInit {
   referralCode = '';
   refStats: any = null;
   copied = false;
+  linkCopied = false;
+  canNativeShare = typeof navigator !== 'undefined' && !!(navigator as any).share;
   applyCodeInput = '';
   applyingCode = false;
   loyaltyBalance: LoyaltyBalance | null = null;
@@ -442,11 +476,48 @@ export class ProfileComponent implements OnInit {
     });
   }
 
+  get shareLink(): string {
+    return this.referralCode ? `${window.location.origin}/auth/register?ref=${this.referralCode}` : '';
+  }
+
+  get shareMessage(): string {
+    return `Hey! Use my referral code ${this.referralCode} on ShopEase and we'll both get ₹100 in loyalty points. Sign up here: ${this.shareLink}`;
+  }
+
   copyCode() {
     navigator.clipboard.writeText(this.referralCode).then(() => {
       this.copied = true;
       setTimeout(() => this.copied = false, 2000);
     });
+  }
+
+  copyLink() {
+    navigator.clipboard.writeText(this.shareLink).then(() => {
+      this.linkCopied = true;
+      setTimeout(() => this.linkCopied = false, 2000);
+    });
+  }
+
+  shareViaWhatsApp() {
+    window.open(`https://wa.me/?text=${encodeURIComponent(this.shareMessage)}`, '_blank');
+  }
+
+  shareViaTwitter() {
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(this.shareMessage)}`, '_blank');
+  }
+
+  shareViaFacebook() {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(this.shareLink)}`, '_blank');
+  }
+
+  shareViaEmail() {
+    const subject = encodeURIComponent('Join me on ShopEase!');
+    const body = encodeURIComponent(this.shareMessage);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  }
+
+  shareNative() {
+    (navigator as any).share?.({ title: 'ShopEase Referral', text: this.shareMessage, url: this.shareLink }).catch(() => {});
   }
 
   private emptyForm(): CreateAddress {
