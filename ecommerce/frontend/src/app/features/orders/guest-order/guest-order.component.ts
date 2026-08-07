@@ -1,8 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, ActivatedRoute, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { OrderService } from '../../../core/services/order.service';
+import { OrderTrackingService } from '../../../core/services/order-tracking.service';
 import { Order } from '../../../core/models/order.models';
 
 @Component({
@@ -37,7 +39,10 @@ import { Order } from '../../../core/models/order.models';
             <span class="label">Order Number</span>
             <span class="order-num">#{{ order.id }}</span>
           </div>
-          <span [class]="'status-badge status-' + order.status.toLowerCase()">{{ order.status }}</span>
+          <span>
+            <span [class]="'status-badge status-' + order.status.toLowerCase()">{{ order.status }}</span>
+            <span *ngIf="liveConnected" class="live-chip"><span class="live-dot"></span>Live</span>
+          </span>
         </div>
 
         <div class="items-card">
@@ -91,8 +96,12 @@ import { Order } from '../../../core/models/order.models';
     .status-pending { background: #fff8e1; color: #f39c12; }
     .status-processing { background: #e3f2fd; color: #1976d2; }
     .status-shipped { background: #e8f5e9; color: #2e7d32; }
+    .status-outfordelivery { background: #f0edff; color: #6c63ff; }
     .status-delivered { background: #e8f5e9; color: #2e7d32; }
     .status-cancelled { background: #fce4ec; color: #c62828; }
+    .live-chip { font-size: 0.72rem; font-weight: 700; color: #00b894; background: #e8f8f4; padding: 0.25rem 0.7rem; border-radius: 20px; margin-left: 0.6rem; display: inline-flex; align-items: center; gap: 0.3rem; }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #00b894; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     .items-card, .info-card { background: #fff; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 1.25rem; }
     h3 { font-size: 0.9rem; font-weight: 800; color: #1a1a2e; margin-bottom: 1rem; }
     .item-row { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.85rem; }
@@ -110,14 +119,22 @@ import { Order } from '../../../core/models/order.models';
     .btn-another { background: none; border: 2px solid #6c63ff; color: #6c63ff; padding: 0.8rem 1.75rem; border-radius: 30px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
   `]
 })
-export class GuestOrderComponent implements OnInit {
+export class GuestOrderComponent implements OnInit, OnDestroy {
   order: Order | null = null;
   loading = false;
   error = '';
   lookupId: number | null = null;
   lookupEmail = '';
+  liveConnected = false;
+  private trackedOrderId: number | null = null;
+  private trackingSub?: Subscription;
 
-  constructor(private route: ActivatedRoute, private router: Router, private orderService: OrderService) {}
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private orderService: OrderService,
+    private tracking: OrderTrackingService
+  ) {}
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -142,12 +159,46 @@ export class GuestOrderComponent implements OnInit {
     this.loading = true;
     this.error = '';
     this.orderService.getGuestOrder(id, email).subscribe({
-      next: o => { this.order = o; this.loading = false; },
+      next: o => {
+        this.order = o;
+        this.loading = false;
+        if (o.status !== 'Delivered' && o.status !== 'Cancelled') this.startLiveTracking(id);
+      },
       error: () => { this.loading = false; this.error = 'No matching order found for that number and email.'; }
     });
   }
 
+  private startLiveTracking(orderId: number) {
+    this.trackedOrderId = orderId;
+    this.tracking.trackOrder(orderId).then(() => this.liveConnected = true);
+    this.trackingSub = this.tracking.updates.subscribe(update => {
+      if (!this.order || update.orderId !== orderId) return;
+      const history = [...(this.order.statusHistory ?? [])];
+      if (!history.some(h => h.status === update.status)) {
+        history.push({ status: update.status, changedAt: update.changedAt, note: update.note });
+      }
+      this.order = {
+        ...this.order,
+        status: update.status,
+        statusHistory: history,
+        trackingNumber: update.trackingNumber ?? this.order.trackingNumber,
+        carrier: update.carrier ?? this.order.carrier,
+      };
+      if (update.status === 'Delivered' || update.status === 'Cancelled') {
+        this.tracking.stopTracking(orderId);
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    this.trackingSub?.unsubscribe();
+    if (this.trackedOrderId != null) this.tracking.stopTracking(this.trackedOrderId);
+  }
+
   reset() {
+    if (this.trackedOrderId != null) { this.tracking.stopTracking(this.trackedOrderId); this.trackedOrderId = null; }
+    this.trackingSub?.unsubscribe();
+    this.liveConnected = false;
     this.order = null;
     this.lookupId = null;
     this.lookupEmail = '';

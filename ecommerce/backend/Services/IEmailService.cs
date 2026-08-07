@@ -5,6 +5,7 @@ public interface IEmailService
     Task SendOrderConfirmationAsync(string toEmail, string userName, int orderId, decimal amount);
     Task SendOrderProcessingAsync(string toEmail, string userName, int orderId);
     Task SendOrderShippedAsync(string toEmail, string userName, int orderId);
+    Task SendOrderOutForDeliveryAsync(string toEmail, string userName, int orderId);
     Task SendOrderDeliveredAsync(string toEmail, string userName, int orderId);
     Task SendOrderCancelledAsync(string toEmail, string userName, int orderId);
     Task SendWelcomeEmailAsync(string toEmail, string userName);

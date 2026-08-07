@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using ECommerceAPI.Data;
 using ECommerceAPI.DTOs;
+using ECommerceAPI.Hubs;
 
 namespace ECommerceAPI.Services;
 
-public class DashboardService(AppDbContext db, IEmailService emailService, INotificationService notificationService) : IDashboardService
+public class DashboardService(AppDbContext db, IEmailService emailService, INotificationService notificationService, IHubContext<NotificationHub> hub) : IDashboardService
 {
     public async Task<DashboardStatsDto> GetStatsAsync()
     {
@@ -155,18 +157,20 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
         order.Status = status;
         if (trackingNumber != null) order.TrackingNumber = trackingNumber;
         if (carrier != null) order.Carrier = carrier;
+        var statusNote = status switch
+        {
+            "Processing" => "Order confirmed and being prepared",
+            "Shipped" => "Order dispatched and on the way",
+            "OutForDelivery" => "Order is out for delivery",
+            "Delivered" => "Order delivered successfully",
+            "Cancelled" => "Order has been cancelled",
+            _ => null
+        };
         db.OrderStatusHistories.Add(new ECommerceAPI.Models.OrderStatusHistory
         {
             OrderId = orderId,
             Status = status,
-            Note = status switch
-            {
-                "Processing" => "Order confirmed and being prepared",
-                "Shipped" => "Order dispatched and on the way",
-                "Delivered" => "Order delivered successfully",
-                "Cancelled" => "Order has been cancelled",
-                _ => null
-            }
+            Note = statusNote
         });
         await db.SaveChangesAsync();
 
@@ -184,6 +188,12 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
             if (email != null) _ = emailService.SendOrderShippedAsync(email, name, orderId);
             if (order.UserId.HasValue) await notificationService.CreateNotificationAsync(new DTOs.CreateNotificationDto(
                 order.UserId.Value, "Order Shipped!", $"Your order #{orderId} is on its way!", "order", "/orders"));
+        }
+        else if (status == "OutForDelivery")
+        {
+            if (email != null) _ = emailService.SendOrderOutForDeliveryAsync(email, name, orderId);
+            if (order.UserId.HasValue) await notificationService.CreateNotificationAsync(new DTOs.CreateNotificationDto(
+                order.UserId.Value, "Out for Delivery!", $"Your order #{orderId} is out for delivery and will arrive today.", "order", "/orders"));
         }
         else if (status == "Delivered")
         {
@@ -212,6 +222,17 @@ public class DashboardService(AppDbContext db, IEmailService emailService, INoti
             if (order.UserId.HasValue) await notificationService.CreateNotificationAsync(new DTOs.CreateNotificationDto(
                 order.UserId.Value, "Order Cancelled", $"Your order #{orderId} has been cancelled.", "order", "/orders"));
         }
+
+        await hub.Clients.Group($"order_{orderId}").SendAsync("OrderStatusUpdated", new
+        {
+            orderId,
+            status,
+            trackingNumber = order.TrackingNumber,
+            carrier = order.Carrier,
+            changedAt = DateTime.UtcNow,
+            note = statusNote
+        });
+
         return true;
     }
 

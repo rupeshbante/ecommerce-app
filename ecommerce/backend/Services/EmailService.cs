@@ -60,6 +60,19 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
           </div>
         </div>");
 
+    public Task SendOrderOutForDeliveryAsync(string toEmail, string userName, int orderId) =>
+        SendAsync(toEmail, $"Order #{orderId} is Out for Delivery! - ShopEase", $@"
+        <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>
+          <div style='background:linear-gradient(135deg,#1a1a2e,#6c63ff);padding:2rem;text-align:center;'>
+            <h1 style='color:#fff;margin:0;'>Out for Delivery!</h1>
+          </div>
+          <div style='padding:2rem;'>
+            <p>Hi <strong>{userName}</strong>,</p>
+            <p>Your order <strong>#{orderId}</strong> is out for delivery and will reach you today.</p>
+            <a href='https://shopease.in/orders' style='display:inline-block;background:#6c63ff;color:#fff;text-decoration:none;padding:0.9rem 2rem;border-radius:10px;font-weight:600;margin-top:1rem;'>Track Order</a>
+          </div>
+        </div>");
+
     public Task SendOrderDeliveredAsync(string toEmail, string userName, int orderId) =>
         SendAsync(toEmail, $"Order #{orderId} Delivered! Rate your experience", $@"
         <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>

@@ -140,6 +140,7 @@ import { AdminOrderSummary, AdminOrderDetail } from '../../../core/models/admin.
     .status-sel-delivered { background: #e8f5e9; color: #2e7d32; border-color: #2e7d32; }
     .status-sel-cancelled { background: #fce4ec; color: #c62828; border-color: #c62828; }
     .status-sel-processing { background: #e3f2fd; color: #1976d2; border-color: #1976d2; }
+    .status-sel-outfordelivery { background: #f0edff; color: #6c63ff; border-color: #6c63ff; }
     .btn-icon { background: #f5f5f5; border: none; border-radius: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem; transition: all 0.18s; }
     .btn-icon:hover { background: #f0edff; transform: scale(1.1); }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
@@ -158,6 +159,7 @@ import { AdminOrderSummary, AdminOrderDetail } from '../../../core/models/admin.
     .badge-pending { background: #fff8e1; color: #f39c12; }
     .badge-delivered { background: #e8f5e9; color: #2e7d32; }
     .badge-cancelled { background: #fce4ec; color: #c62828; }
+    .badge-outfordelivery { background: #f0edff; color: #6c63ff; }
     .items-section h4, .status-update h4 { font-size: 0.85rem; font-weight: 700; color: #1e2a38; margin-bottom: 0.75rem; }
     .items-table { width: 100%; border-collapse: collapse; }
     .items-table th { text-align: left; font-size: 0.72rem; font-weight: 700; color: #888; padding: 0.5rem; border-bottom: 1px solid #eee; }
@@ -182,7 +184,7 @@ export class AdminOrdersComponent implements OnInit {
   private searchDebounce: any;
   newStatus = 'Pending';
   trackingNumber = ''; carrier = '';
-  statusOptions = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
+  statusOptions = ['Pending', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered', 'Cancelled'];
   statuses = [
     { label: 'All', val: '' },
     { label: 'Pending', val: 'Pending' },

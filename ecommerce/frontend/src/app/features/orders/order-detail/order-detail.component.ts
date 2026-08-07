@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { OrderService } from '../../../core/services/order.service';
+import { OrderTrackingService } from '../../../core/services/order-tracking.service';
 import { Order } from '../../../core/models/order.models';
 
 interface TrackingStep {
@@ -14,12 +16,13 @@ interface TrackingStep {
   note?: string;
 }
 
-const STATUS_ORDER = ['Pending', 'Processing', 'Shipped', 'Delivered'];
+const STATUS_ORDER = ['Pending', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered'];
 const STEP_META: Record<string, { label: string; icon: string }> = {
-  Pending:    { label: 'Order Placed',    icon: '🛒' },
-  Processing: { label: 'Processing',      icon: '⚙️' },
-  Shipped:    { label: 'Shipped',         icon: '🚚' },
-  Delivered:  { label: 'Delivered',       icon: '✅' },
+  Pending:        { label: 'Order Placed',     icon: '🛒' },
+  Processing:     { label: 'Processing',       icon: '⚙️' },
+  Shipped:        { label: 'Shipped',          icon: '🚚' },
+  OutForDelivery: { label: 'Out for Delivery', icon: '🛵' },
+  Delivered:      { label: 'Delivered',        icon: '✅' },
 };
 
 @Component({
@@ -66,7 +69,10 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
             <span class="order-num">Order #{{ order.id }}</span>
             <span class="order-date">{{ order.orderDate | date:'dd MMMM yyyy, h:mm a' }}</span>
           </div>
-          <span [class]="'status-badge status-' + order.status.toLowerCase()">{{ statusIcon(order.status) }} {{ order.status }}</span>
+          <span>
+            <span [class]="'status-badge status-' + order.status.toLowerCase()">{{ statusIcon(order.status) }} {{ order.status }}</span>
+            <span *ngIf="liveConnected" class="live-chip"><span class="live-dot"></span>Live</span>
+          </span>
         </div>
 
         <!-- Tracking timeline -->
@@ -229,8 +235,12 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
     .status-pending { background: #fff8e1; color: #f39c12; }
     .status-processing { background: #e3f2fd; color: #1976d2; }
     .status-shipped { background: #e8f5e9; color: #2e7d32; }
+    .status-outfordelivery { background: #f0edff; color: #6c63ff; }
     .status-delivered { background: #e8f5e9; color: #2e7d32; }
     .status-cancelled { background: #fce4ec; color: #c62828; }
+
+    .live-chip { font-size: 0.72rem; font-weight: 700; color: #00b894; background: #e8f8f4; padding: 0.25rem 0.7rem; border-radius: 20px; margin-left: 0.6rem; display: inline-flex; align-items: center; gap: 0.3rem; }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #00b894; animation: pulse 2s infinite; }
 
     .timeline-card, .items-card, .price-card, .info-card { background: #fff; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
     h3 { font-size: 0.95rem; font-weight: 800; color: #1a1a2e; margin-bottom: 1.25rem; }
@@ -313,11 +323,14 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
     }
   `]
 })
-export class OrderDetailComponent implements OnInit {
+export class OrderDetailComponent implements OnInit, OnDestroy {
   order: Order | null = null;
   loading = true;
   generatingPdf = false;
   copied = false;
+  liveConnected = false;
+  private orderId = 0;
+  private trackingSub?: Subscription;
 
   get subtotal() {
     if (!this.order) return 0;
@@ -350,13 +363,47 @@ export class OrderDetailComponent implements OnInit {
     return eta.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  constructor(private route: ActivatedRoute, private orderService: OrderService) {}
+  constructor(
+    private route: ActivatedRoute,
+    private orderService: OrderService,
+    private tracking: OrderTrackingService
+  ) {}
 
   ngOnInit() {
-    const id = Number(this.route.snapshot.paramMap.get('id'));
-    this.orderService.getById(id).subscribe({
-      next: o => { this.order = o; this.loading = false; },
+    this.orderId = Number(this.route.snapshot.paramMap.get('id'));
+    this.orderService.getById(this.orderId).subscribe({
+      next: o => {
+        this.order = o;
+        this.loading = false;
+        if (o.status !== 'Delivered' && o.status !== 'Cancelled') this.startLiveTracking();
+      },
       error: () => { this.loading = false; }
+    });
+  }
+
+  ngOnDestroy() {
+    this.trackingSub?.unsubscribe();
+    this.tracking.stopTracking(this.orderId);
+  }
+
+  private startLiveTracking() {
+    this.tracking.trackOrder(this.orderId).then(() => this.liveConnected = true);
+    this.trackingSub = this.tracking.updates.subscribe(update => {
+      if (!this.order || update.orderId !== this.orderId) return;
+      const history = [...(this.order.statusHistory ?? [])];
+      if (!history.some(h => h.status === update.status)) {
+        history.push({ status: update.status, changedAt: update.changedAt, note: update.note });
+      }
+      this.order = {
+        ...this.order,
+        status: update.status,
+        statusHistory: history,
+        trackingNumber: update.trackingNumber ?? this.order.trackingNumber,
+        carrier: update.carrier ?? this.order.carrier,
+      };
+      if (update.status === 'Delivered' || update.status === 'Cancelled') {
+        this.tracking.stopTracking(this.orderId);
+      }
     });
   }
 
@@ -369,7 +416,7 @@ export class OrderDetailComponent implements OnInit {
   }
 
   statusIcon(status: string): string {
-    const icons: Record<string, string> = { Pending: '🕐', Processing: '⚙️', Shipped: '🚚', Delivered: '✅', Cancelled: '❌' };
+    const icons: Record<string, string> = { Pending: '🕐', Processing: '⚙️', Shipped: '🚚', OutForDelivery: '🛵', Delivered: '✅', Cancelled: '❌' };
     return icons[status] ?? '📦';
   }
 
