@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { OrderService } from '../../../core/services/order.service';
+import { OrderTrackingService } from '../../../core/services/order-tracking.service';
 import { Order } from '../../../core/models/order.models';
 
 interface TrackingStep {
@@ -14,12 +16,13 @@ interface TrackingStep {
   note?: string;
 }
 
-const STATUS_ORDER = ['Pending', 'Processing', 'Shipped', 'Delivered'];
+const STATUS_ORDER = ['Pending', 'Processing', 'Shipped', 'OutForDelivery', 'Delivered'];
 const STEP_META: Record<string, { label: string; icon: string }> = {
-  Pending:    { label: 'Order Placed',    icon: '🛒' },
-  Processing: { label: 'Processing',      icon: '⚙️' },
-  Shipped:    { label: 'Shipped',         icon: '🚚' },
-  Delivered:  { label: 'Delivered',       icon: '✅' },
+  Pending:        { label: 'Order Placed',     icon: '🛒' },
+  Processing:     { label: 'Processing',       icon: '⚙️' },
+  Shipped:        { label: 'Shipped',          icon: '🚚' },
+  OutForDelivery: { label: 'Out for Delivery', icon: '🛵' },
+  Delivered:      { label: 'Delivered',        icon: '✅' },
 };
 
 @Component({
@@ -66,7 +69,10 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
             <span class="order-num">Order #{{ order.id }}</span>
             <span class="order-date">{{ order.orderDate | date:'dd MMMM yyyy, h:mm a' }}</span>
           </div>
-          <span [class]="'status-badge status-' + order.status.toLowerCase()">{{ statusIcon(order.status) }} {{ order.status }}</span>
+          <span>
+            <span [class]="'status-badge status-' + order.status.toLowerCase()">{{ statusIcon(order.status) }} {{ order.status }}</span>
+            <span *ngIf="liveConnected" class="live-chip"><span class="live-dot"></span>Live</span>
+          </span>
         </div>
 
         <!-- Tracking timeline -->
@@ -76,6 +82,13 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
             <span *ngIf="order.status !== 'Delivered' && order.status !== 'Cancelled'" class="eta-chip">
               📅 Est. delivery: {{ estimatedDelivery }}
             </span>
+          </div>
+          <div class="courier-row" *ngIf="order.trackingNumber">
+            <div class="courier-info">
+              <span class="courier-label">{{ order.carrier || 'Courier' }} Tracking No.</span>
+              <span class="courier-number">{{ order.trackingNumber }}</span>
+            </div>
+            <button class="btn-copy" (click)="copyTracking()">{{ copied ? '✓ Copied' : '📋 Copy' }}</button>
           </div>
           <div class="timeline">
             <ng-container *ngFor="let step of trackingSteps; let last = last">
@@ -132,6 +145,10 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
                 <div class="price-row discount" *ngIf="order.discountAmount && order.discountAmount > 0">
                   <span>Coupon Discount ({{ order.couponCode }})</span>
                   <span>−₹{{ order.discountAmount | number }}</span>
+                </div>
+                <div class="price-row discount" *ngIf="order.pointsDiscountAmount && order.pointsDiscountAmount > 0">
+                  <span>Loyalty Points Used ({{ order.pointsRedeemed }} pts)</span>
+                  <span>−₹{{ order.pointsDiscountAmount | number }}</span>
                 </div>
                 <div class="price-row">
                   <span>Delivery</span>
@@ -218,8 +235,12 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
     .status-pending { background: #fff8e1; color: #f39c12; }
     .status-processing { background: #e3f2fd; color: #1976d2; }
     .status-shipped { background: #e8f5e9; color: #2e7d32; }
+    .status-outfordelivery { background: #f0edff; color: #6c63ff; }
     .status-delivered { background: #e8f5e9; color: #2e7d32; }
     .status-cancelled { background: #fce4ec; color: #c62828; }
+
+    .live-chip { font-size: 0.72rem; font-weight: 700; color: #00b894; background: #e8f8f4; padding: 0.25rem 0.7rem; border-radius: 20px; margin-left: 0.6rem; display: inline-flex; align-items: center; gap: 0.3rem; }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #00b894; animation: pulse 2s infinite; }
 
     .timeline-card, .items-card, .price-card, .info-card { background: #fff; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
     h3 { font-size: 0.95rem; font-weight: 800; color: #1a1a2e; margin-bottom: 1.25rem; }
@@ -227,6 +248,11 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
     .tl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
     .tl-header h3 { margin-bottom: 0; }
     .eta-chip { font-size: 0.78rem; font-weight: 600; color: #6c63ff; background: #f0edff; padding: 0.3rem 0.75rem; border-radius: 20px; }
+    .courier-row { display: flex; justify-content: space-between; align-items: center; background: #f9f9ff; border: 1px dashed #d8d3ff; border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; }
+    .courier-info { display: flex; flex-direction: column; gap: 0.15rem; }
+    .courier-label { font-size: 0.72rem; color: #888; font-weight: 600; text-transform: uppercase; }
+    .courier-number { font-size: 0.95rem; color: #1a1a2e; font-weight: 800; letter-spacing: 0.5px; }
+    .btn-copy { background: #6c63ff; color: #fff; border: none; border-radius: 20px; padding: 0.4rem 0.9rem; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
     .timeline { display: flex; flex-direction: column; }
     .tl-item { display: flex; gap: 1rem; align-items: flex-start; }
     .tl-dot-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
@@ -297,10 +323,14 @@ const STEP_META: Record<string, { label: string; icon: string }> = {
     }
   `]
 })
-export class OrderDetailComponent implements OnInit {
+export class OrderDetailComponent implements OnInit, OnDestroy {
   order: Order | null = null;
   loading = true;
   generatingPdf = false;
+  copied = false;
+  liveConnected = false;
+  private orderId = 0;
+  private trackingSub?: Subscription;
 
   get subtotal() {
     if (!this.order) return 0;
@@ -333,18 +363,60 @@ export class OrderDetailComponent implements OnInit {
     return eta.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  constructor(private route: ActivatedRoute, private orderService: OrderService) {}
+  constructor(
+    private route: ActivatedRoute,
+    private orderService: OrderService,
+    private tracking: OrderTrackingService
+  ) {}
 
   ngOnInit() {
-    const id = Number(this.route.snapshot.paramMap.get('id'));
-    this.orderService.getById(id).subscribe({
-      next: o => { this.order = o; this.loading = false; },
+    this.orderId = Number(this.route.snapshot.paramMap.get('id'));
+    this.orderService.getById(this.orderId).subscribe({
+      next: o => {
+        this.order = o;
+        this.loading = false;
+        if (o.status !== 'Delivered' && o.status !== 'Cancelled') this.startLiveTracking();
+      },
       error: () => { this.loading = false; }
     });
   }
 
+  ngOnDestroy() {
+    this.trackingSub?.unsubscribe();
+    this.tracking.stopTracking(this.orderId);
+  }
+
+  private startLiveTracking() {
+    this.tracking.trackOrder(this.orderId).then(() => this.liveConnected = true);
+    this.trackingSub = this.tracking.updates.subscribe(update => {
+      if (!this.order || update.orderId !== this.orderId) return;
+      const history = [...(this.order.statusHistory ?? [])];
+      if (!history.some(h => h.status === update.status)) {
+        history.push({ status: update.status, changedAt: update.changedAt, note: update.note });
+      }
+      this.order = {
+        ...this.order,
+        status: update.status,
+        statusHistory: history,
+        trackingNumber: update.trackingNumber ?? this.order.trackingNumber,
+        carrier: update.carrier ?? this.order.carrier,
+      };
+      if (update.status === 'Delivered' || update.status === 'Cancelled') {
+        this.tracking.stopTracking(this.orderId);
+      }
+    });
+  }
+
+  copyTracking() {
+    if (!this.order?.trackingNumber) return;
+    navigator.clipboard.writeText(this.order.trackingNumber).then(() => {
+      this.copied = true;
+      setTimeout(() => this.copied = false, 2000);
+    });
+  }
+
   statusIcon(status: string): string {
-    const icons: Record<string, string> = { Pending: '🕐', Processing: '⚙️', Shipped: '🚚', Delivered: '✅', Cancelled: '❌' };
+    const icons: Record<string, string> = { Pending: '🕐', Processing: '⚙️', Shipped: '🚚', OutForDelivery: '🛵', Delivered: '✅', Cancelled: '❌' };
     return icons[status] ?? '📦';
   }
 
@@ -443,6 +515,8 @@ export class OrderDetailComponent implements OnInit {
     ];
     if (o.discountAmount && o.discountAmount > 0)
       summaryLines.push({ label: `Discount (${o.couponCode})`, value: `-${rs(o.discountAmount)}`, green: true });
+    if (o.pointsDiscountAmount && o.pointsDiscountAmount > 0)
+      summaryLines.push({ label: `Loyalty Points Used (${o.pointsRedeemed} pts)`, value: `-${rs(o.pointsDiscountAmount)}`, green: true });
     summaryLines.push({ label: 'Delivery', value: delivery === 0 ? 'FREE' : rs(delivery), green: delivery === 0 });
 
     summaryLines.forEach(row => {

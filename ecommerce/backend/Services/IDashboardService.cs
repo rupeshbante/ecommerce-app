@@ -10,7 +10,7 @@ public interface IDashboardService
     Task<AdminCustomerDto?> GetCustomerAsync(int userId);
     Task<List<AdminOrderSummaryDto>> GetAllOrdersAsync(string? status);
     Task<AdminOrderDetailDto?> GetOrderDetailAsync(int orderId);
-    Task<bool> UpdateOrderStatusAsync(int orderId, string status);
+    Task<bool> UpdateOrderStatusAsync(int orderId, string status, string? trackingNumber = null, string? carrier = null);
     Task<bool> UpdateUserRoleAsync(int userId, string role);
     Task<List<AdminOrderSummaryDto>> GetCustomerOrdersAsync(int userId);
 }

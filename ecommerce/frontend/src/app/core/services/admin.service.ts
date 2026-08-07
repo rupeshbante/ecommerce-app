@@ -21,7 +21,9 @@ export class AdminService {
     return this.http.get<PagedResult<AdminOrderSummary>>(`${this.api}/admin/orders`, { params });
   }
   getOrder(id: number) { return this.http.get<AdminOrderDetail>(`${this.api}/admin/orders/${id}`); }
-  updateOrderStatus(id: number, status: string) { return this.http.put(`${this.api}/admin/orders/${id}/status`, { status }); }
+  updateOrderStatus(id: number, status: string, trackingNumber?: string, carrier?: string) {
+    return this.http.put(`${this.api}/admin/orders/${id}/status`, { status, trackingNumber, carrier });
+  }
 
   // Customers
   getCustomers(page = 1, pageSize = 20, search?: string, role?: string) {

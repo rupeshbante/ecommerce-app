@@ -32,6 +32,6 @@ public class ReferralController(IReferralService referralService) : ControllerBa
     public async Task<IActionResult> ApplyCode([FromBody] ApplyReferralDto dto)
     {
         var success = await referralService.ApplyReferralCodeAsync(UserId, dto.Code);
-        return success ? Ok(new { message = "Referral code applied! Reward added." }) : BadRequest(new { message = "Invalid or already used code." });
+        return success ? Ok(new { message = "Referral code applied! ₹100 in loyalty points added to both accounts." }) : BadRequest(new { message = "Invalid or already used code." });
     }
 }

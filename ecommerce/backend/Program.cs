@@ -100,6 +100,10 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IReferralService, ReferralService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IStockNotificationService, StockNotificationService>();
+builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
+builder.Services.AddScoped<IProductQAService, ProductQAService>();
+builder.Services.AddHttpClient<IChatService, ChatService>();
 
 builder.Services.AddCors(options =>
 {
@@ -114,10 +118,49 @@ var app = builder.Build();
 using (var appScope = app.Services.CreateScope())
 {
     var appDb = appScope.ServiceProvider.GetRequiredService<AppDbContext>();
-    appDb.Database.EnsureCreated();
 
-    // Apply new tables migration (idempotent — safe to run every startup)
-    await ECommerceAPI.Data.DatabaseMigrator.ApplyManualMigrationsAsync(appDb);
+    if (pgHost != null)
+    {
+        // Production (Postgres): real, tracked EF migrations from here on. This database
+        // predates migrations — its schema was built up over time via EnsureCreated() plus
+        // hand-written raw SQL — so if the migrations history table doesn't exist yet but the
+        // schema clearly already does, seed history with the baseline migration marked as
+        // already-applied instead of letting MigrateAsync() try to re-create tables that are
+        // already there. This branch only ever fires once, on the first boot after this
+        // shipped; every boot after that, __EFMigrationsHistory already exists and it's skipped.
+        var conn = appDb.Database.GetDbConnection();
+        await conn.OpenAsync();
+        bool historyExists, usersTableExists;
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = '__EFMigrationsHistory')";
+            historyExists = (bool)(await cmd.ExecuteScalarAsync())!;
+        }
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'Users')";
+            usersTableExists = (bool)(await cmd.ExecuteScalarAsync())!;
+        }
+        await conn.CloseAsync();
+
+        if (!historyExists && usersTableExists)
+        {
+            var baselineMigrationId = appDb.Database.GetMigrations().First();
+            await appDb.Database.ExecuteSqlRawAsync(
+                "CREATE TABLE \"__EFMigrationsHistory\" (\"MigrationId\" character varying(150) NOT NULL, \"ProductVersion\" character varying(32) NOT NULL, CONSTRAINT \"PK___EFMigrationsHistory\" PRIMARY KEY (\"MigrationId\"))");
+            await appDb.Database.ExecuteSqlRawAsync(
+                "INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({0}, '8.0.0')", baselineMigrationId);
+        }
+
+        await appDb.Database.MigrateAsync();
+    }
+    else
+    {
+        // Local dev (SQL Server LocalDB): no migration history to manage here, just build the
+        // schema fresh from the current model. If you pull a schema change and your local DB
+        // is stale, drop it (sqllocaldb / SSMS) and let this recreate it.
+        await appDb.Database.EnsureCreatedAsync();
+    }
 
     if (!appDb.Users.Any(u => u.Role == "Admin"))
     {

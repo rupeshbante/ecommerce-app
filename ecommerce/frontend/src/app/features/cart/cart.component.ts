@@ -9,6 +9,7 @@ import { PaymentService } from '../../core/services/payment.service';
 import { AddressService } from '../../core/services/address.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
+import { LoyaltyService } from '../../core/services/loyalty.service';
 import { Address } from '../../core/models/address.models';
 import { environment } from '../../../environments/environment';
 
@@ -83,6 +84,10 @@ import { environment } from '../../../environments/environment';
               <span>Coupon ({{ couponCode }})</span>
               <span class="saved">−₹{{ couponDiscount | number }}</span>
             </div>
+            <div class="sum-line discount-line" *ngIf="pointsDiscount > 0">
+              <span>Points Redeemed</span>
+              <span class="saved">−₹{{ pointsDiscount | number }}</span>
+            </div>
             <div class="sum-line">
               <span>Delivery</span>
               <span [class.free]="subtotalAfterCoupon >= 500">{{ subtotalAfterCoupon >= 500 ? 'FREE' : '₹99' }}</span>
@@ -106,6 +111,26 @@ import { environment } from '../../../environments/environment';
           </p>
 
           <div class="divider"></div>
+
+          <!-- Guest details -->
+          <div class="guest-section" *ngIf="!auth.isLoggedIn()">
+            <p class="guest-note">Checking out as a guest. <a routerLink="/auth/login">Log in</a> for saved addresses, coupons and order history.</p>
+            <div class="guest-fields">
+              <div class="field">
+                <label>Full Name <span class="req">*</span></label>
+                <input [(ngModel)]="guestName" placeholder="Your name" [class.error-border]="guestNameError">
+              </div>
+              <div class="field">
+                <label>Email <span class="req">*</span></label>
+                <input [(ngModel)]="guestEmail" type="email" placeholder="you@example.com" [class.error-border]="guestEmailError">
+              </div>
+              <div class="field">
+                <label>Phone</label>
+                <input [(ngModel)]="guestPhone" placeholder="Phone number (optional)">
+              </div>
+            </div>
+            <p *ngIf="guestNameError || guestEmailError" class="field-error">Please enter your name and a valid email.</p>
+          </div>
 
           <!-- Saved Addresses -->
           <div class="addr-section" *ngIf="auth.isLoggedIn() && savedAddresses.length > 0">
@@ -142,10 +167,22 @@ import { environment } from '../../../environments/environment';
             <p *ngIf="couponApplied" class="coupon-success">✓ Coupon applied! You save ₹{{ couponDiscount | number }}</p>
           </div>
 
+          <!-- Loyalty Points Redemption -->
+          <div class="points-row" *ngIf="auth.isLoggedIn() && loyaltyBalance && loyaltyBalance.points > 0">
+            <label class="points-toggle">
+              <input type="checkbox" [(ngModel)]="redeemPoints" (ngModelChange)="onRedeemToggle()">
+              Redeem points ({{ loyaltyBalance.points }} available, worth ₹{{ loyaltyBalance.points }})
+            </label>
+            <div class="points-input-row" *ngIf="redeemPoints">
+              <input type="number" [(ngModel)]="pointsToUse" (ngModelChange)="clampPoints()" min="0" [max]="maxRedeemablePoints" class="points-input">
+              <span class="points-value">= −₹{{ pointsToUse | number }}</span>
+            </div>
+          </div>
+
           <!-- Payment Method -->
           <div class="payment-method">
             <label>Payment Method</label>
-            <div class="method-options">
+            <div class="method-options" *ngIf="auth.isLoggedIn()">
               <label class="method-opt" [class.selected]="payMethod === 'razorpay'">
                 <input type="radio" name="payMethod" value="razorpay" [(ngModel)]="payMethod">
                 💳 Pay Online (Razorpay)
@@ -155,12 +192,11 @@ import { environment } from '../../../environments/environment';
                 💵 Cash on Delivery
               </label>
             </div>
+            <p class="guest-cod-note" *ngIf="!auth.isLoggedIn()">💵 Guest orders are Cash on Delivery only. Log in to pay online.</p>
           </div>
 
           <button class="btn-checkout" (click)="placeOrder()" [disabled]="loading">
-            <span *ngIf="!loading">
-              🔒 {{ auth.isLoggedIn() ? 'Place Order' : 'Login to Checkout' }}
-            </span>
+            <span *ngIf="!loading">🔒 Place Order</span>
             <span *ngIf="loading" class="loading-dots">Processing...</span>
           </button>
 
@@ -221,6 +257,20 @@ import { environment } from '../../../environments/environment';
     .free-ship-note { font-size: 0.82rem; color: #888; background: #f7f8fc; border-radius: 8px; padding: 0.65rem 0.85rem; margin-top: 0.75rem; line-height: 1.5; }
     .free-ship-note.green { background: #e8f8f5; color: #00b894; }
     .divider { border: none; border-top: 1px solid #f0f0f0; margin: 1.25rem 0; }
+    .guest-section { margin-bottom: 1rem; }
+    .guest-note { font-size: 0.8rem; color: #888; margin-bottom: 0.85rem; line-height: 1.5; }
+    .guest-note a { color: #6c63ff; font-weight: 700; text-decoration: none; }
+    .guest-note a:hover { text-decoration: underline; }
+    .guest-fields { display: flex; flex-direction: column; gap: 0.75rem; }
+    .guest-fields .field label { display: block; font-size: 0.78rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.4rem; }
+    .guest-fields .field input { width: 100%; padding: 0.75rem; border: 1.5px solid #e9ecef; border-radius: 10px; font-size: 0.875rem; outline: none; font-family: inherit; }
+    .guest-fields .field input:focus { border-color: #6c63ff; }
+    .guest-cod-note { font-size: 0.8rem; color: #00897b; background: #f0fdf9; padding: 0.65rem 0.85rem; border-radius: 10px; }
+    .points-row { margin-top: 0.75rem; padding: 0.75rem; background: #f0fdf9; border-radius: 10px; }
+    .points-toggle { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #00897b; font-weight: 600; cursor: pointer; }
+    .points-input-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.6rem; }
+    .points-input { width: 90px; padding: 0.5rem; border: 1.5px solid #b2dfdb; border-radius: 8px; font-size: 0.875rem; outline: none; }
+    .points-value { font-size: 0.85rem; color: #00897b; font-weight: 700; }
     .addr-section label { display: block; font-size: 0.82rem; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.6rem; }
     .req { color: #e17055; }
     textarea, select { width: 100%; padding: 0.85rem; border: 1.5px solid #e9ecef; border-radius: 12px; font-size: 0.875rem; resize: vertical; outline: none; transition: border-color 0.18s; line-height: 1.6; font-family: inherit; background: #fff; }
@@ -264,9 +314,19 @@ export class CartComponent implements OnInit {
   couponLoading = false;
   couponError = '';
   payMethod: 'razorpay' | 'cod' = 'razorpay';
+  guestName = '';
+  guestEmail = '';
+  guestPhone = '';
+  guestNameError = false;
+  guestEmailError = false;
+  loyaltyBalance: { points: number; valueInRupees: number } | null = null;
+  redeemPoints = false;
+  pointsToUse = 0;
 
   get subtotalAfterCoupon() { return Math.max(0, this.cart.totalPrice() - this.couponDiscount); }
-  get grandTotal() { return this.subtotalAfterCoupon + (this.subtotalAfterCoupon >= 500 ? 0 : 99); }
+  get pointsDiscount() { return this.redeemPoints ? this.pointsToUse : 0; }
+  get maxRedeemablePoints() { return Math.min(this.loyaltyBalance?.points ?? 0, Math.floor(this.subtotalAfterCoupon)); }
+  get grandTotal() { return Math.max(0, this.subtotalAfterCoupon - this.pointsDiscount) + (this.subtotalAfterCoupon >= 500 ? 0 : 99); }
 
   constructor(
     public cart: CartService,
@@ -276,7 +336,8 @@ export class CartComponent implements OnInit {
     public auth: AuthService,
     private router: Router,
     private toasts: ToastService,
-    private http: HttpClient
+    private http: HttpClient,
+    private loyaltyService: LoyaltyService
   ) {}
 
   ngOnInit() {
@@ -288,7 +349,16 @@ export class CartComponent implements OnInit {
           if (def) this.selectedAddressId = def.id;
         }
       });
+      this.loyaltyService.getBalance().subscribe({ next: b => this.loyaltyBalance = b, error: () => {} });
     }
+  }
+
+  onRedeemToggle() {
+    this.pointsToUse = this.redeemPoints ? this.maxRedeemablePoints : 0;
+  }
+
+  clampPoints() {
+    this.pointsToUse = Math.max(0, Math.min(this.pointsToUse, this.maxRedeemablePoints));
   }
 
   onAddressSelect() {
@@ -334,11 +404,6 @@ export class CartComponent implements OnInit {
   }
 
   async placeOrder() {
-    if (!this.auth.isLoggedIn()) {
-      this.toasts.info('Please login to place an order.');
-      this.router.navigate(['/auth/login']);
-      return;
-    }
     const finalAddress = this.selectedAddressId > 0 ? this.address : this.address.trim();
     if (!finalAddress) {
       this.addressError = true;
@@ -346,13 +411,19 @@ export class CartComponent implements OnInit {
       return;
     }
     this.addressError = false;
-    this.loading = true;
 
+    if (!this.auth.isLoggedIn()) {
+      this.placeGuestOrder(finalAddress);
+      return;
+    }
+
+    this.loading = true;
     const orderPayload = {
       shippingAddress: finalAddress,
       items: this.cart.items().map(i => ({ productId: i.product.id, quantity: i.quantity })),
       couponCode: this.couponCode || undefined,
-      addressId: this.selectedAddressId > 0 ? this.selectedAddressId : undefined
+      addressId: this.selectedAddressId > 0 ? this.selectedAddressId : undefined,
+      pointsToRedeem: this.pointsDiscount > 0 ? this.pointsToUse : undefined
     };
 
     this.orderService.createOrder(orderPayload).subscribe({
@@ -365,6 +436,38 @@ export class CartComponent implements OnInit {
           this.router.navigate(['/orders/success', order.id]);
         }
         this.loading = false;
+      },
+      error: () => {
+        this.toasts.error('Failed to place order. Please try again.');
+        this.loading = false;
+      }
+    });
+  }
+
+  private placeGuestOrder(finalAddress: string) {
+    this.guestNameError = !this.guestName.trim();
+    this.guestEmailError = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.guestEmail.trim());
+    if (this.guestNameError || this.guestEmailError) {
+      this.toasts.error('Please enter your name and a valid email.');
+      return;
+    }
+
+    this.loading = true;
+    const orderPayload = {
+      shippingAddress: finalAddress,
+      items: this.cart.items().map(i => ({ productId: i.product.id, quantity: i.quantity })),
+      couponCode: this.couponCode || undefined,
+      guestName: this.guestName.trim(),
+      guestEmail: this.guestEmail.trim(),
+      guestPhone: this.guestPhone.trim() || undefined
+    };
+
+    this.orderService.createGuestOrder(orderPayload).subscribe({
+      next: (order) => {
+        this.cart.clearCart();
+        this.loading = false;
+        this.toasts.success('Order placed! Pay on delivery. 🎉');
+        this.router.navigate(['/orders/guest', order.id], { queryParams: { email: orderPayload.guestEmail } });
       },
       error: () => {
         this.toasts.error('Failed to place order. Please try again.');

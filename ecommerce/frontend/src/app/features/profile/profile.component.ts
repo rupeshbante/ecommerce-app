@@ -4,9 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AddressService } from '../../core/services/address.service';
 import { ReferralService } from '../../core/services/referral.service';
+import { LoyaltyService } from '../../core/services/loyalty.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { Address, CreateAddress } from '../../core/models/address.models';
+import { LoyaltyBalance, LoyaltyTransaction } from '../../core/models/loyalty.models';
 
 @Component({
   selector: 'app-profile',
@@ -27,6 +29,8 @@ import { Address, CreateAddress } from '../../core/models/address.models';
       <div class="tabs">
         <button [class.active]="tab === 'addresses'" (click)="tab='addresses'">Address Book</button>
         <button [class.active]="tab === 'referral'" (click)="tab='referral'; loadReferral()">Refer & Earn</button>
+        <button [class.active]="tab === 'loyalty'" (click)="tab='loyalty'; loadLoyalty()">Loyalty Points</button>
+        <button [class.active]="tab === 'security'" (click)="tab='security'; loadSecurity()">Security</button>
       </div>
 
       <!-- ADDRESS BOOK -->
@@ -115,7 +119,7 @@ import { Address, CreateAddress } from '../../core/models/address.models';
       <div *ngIf="tab === 'referral'" class="referral-section">
         <div class="ref-hero">
           <h2>Refer Friends & Earn ₹100</h2>
-          <p>Share your unique referral code. When a friend signs up using your code, you both get ₹100 discount!</p>
+          <p>Share your unique referral code. When a friend signs up using your code, you both get ₹100 in loyalty points!</p>
         </div>
 
         <div class="ref-code-card" *ngIf="referralCode">
@@ -124,7 +128,40 @@ import { Address, CreateAddress } from '../../core/models/address.models';
             <span class="code">{{ referralCode }}</span>
             <button class="btn-copy" (click)="copyCode()">{{ copied ? 'Copied!' : 'Copy' }}</button>
           </div>
-          <p class="share-text">Share link: shopease.in/register?ref={{ referralCode }}</p>
+
+          <span class="code-label">Shareable Link</span>
+          <div class="code-box">
+            <span class="share-link">{{ shareLink }}</span>
+            <button class="btn-copy" (click)="copyLink()">{{ linkCopied ? 'Copied!' : 'Copy Link' }}</button>
+          </div>
+
+          <div class="share-row">
+            <button class="share-btn share-whatsapp" (click)="shareViaWhatsApp()">
+              <span>💬</span> WhatsApp
+            </button>
+            <button class="share-btn share-twitter" (click)="shareViaTwitter()">
+              <span>𝕏</span> Twitter
+            </button>
+            <button class="share-btn share-facebook" (click)="shareViaFacebook()">
+              <span>📘</span> Facebook
+            </button>
+            <button class="share-btn share-email" (click)="shareViaEmail()">
+              <span>✉️</span> Email
+            </button>
+            <button class="share-btn share-native" *ngIf="canNativeShare" (click)="shareNative()">
+              <span>📤</span> More
+            </button>
+          </div>
+        </div>
+
+        <div class="ref-code-card">
+          <span class="code-label">Have a Friend's Code?</span>
+          <div class="code-box">
+            <input [(ngModel)]="applyCodeInput" placeholder="Enter referral code" class="apply-code-input" [disabled]="applyingCode">
+            <button class="btn-copy" (click)="applyReferralCode()" [disabled]="applyingCode || !applyCodeInput.trim()">
+              {{ applyingCode ? 'Applying...' : 'Redeem' }}
+            </button>
+          </div>
         </div>
 
         <div class="ref-stats" *ngIf="refStats">
@@ -147,9 +184,59 @@ import { Address, CreateAddress } from '../../core/models/address.models';
           <div class="steps">
             <div class="step"><span class="step-num">1</span><p>Share your code with friends</p></div>
             <div class="step"><span class="step-num">2</span><p>Friend registers using your code</p></div>
-            <div class="step"><span class="step-num">3</span><p>Both of you get ₹100 discount!</p></div>
+            <div class="step"><span class="step-num">3</span><p>Both of you get ₹100 in loyalty points!</p></div>
           </div>
         </div>
+      </div>
+
+      <!-- LOYALTY POINTS -->
+      <div *ngIf="tab === 'loyalty'" class="referral-section">
+        <div class="ref-hero loyalty-hero">
+          <h2>Your Loyalty Points</h2>
+          <p>Earn 1 point for every ₹10 you spend. Every point delivered is worth ₹1 off your next order.</p>
+        </div>
+
+        <div class="ref-stats" *ngIf="loyaltyBalance">
+          <div class="stat-box">
+            <span class="stat-num">{{ loyaltyBalance.points }}</span>
+            <span class="stat-label">Points Balance</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num">₹{{ loyaltyBalance.valueInRupees }}</span>
+            <span class="stat-label">Redeemable Value</span>
+          </div>
+        </div>
+
+        <div class="how-it-works">
+          <h3>Recent Activity</h3>
+          <div *ngIf="loyaltyHistory.length === 0" class="empty-addr">
+            <p>No points activity yet. Place and receive an order to start earning!</p>
+          </div>
+          <div class="loyalty-row" *ngFor="let t of loyaltyHistory">
+            <div>
+              <span class="loyalty-reason">{{ t.reason === 'OrderDelivered' ? 'Earned from order' + (t.orderId ? ' #' + t.orderId : '') : 'Redeemed at checkout' + (t.orderId ? ' on order #' + t.orderId : '') }}</span>
+              <span class="loyalty-date">{{ t.createdAt | date:'dd MMM yyyy' }}</span>
+            </div>
+            <span [class]="'loyalty-points ' + (t.points >= 0 ? 'positive' : 'negative')">{{ t.points >= 0 ? '+' : '' }}{{ t.points }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECURITY -->
+      <div *ngIf="tab === 'security'" class="security-section">
+        <div class="sec-card">
+          <div class="sec-info">
+            <h3>Two-Factor Authentication</h3>
+            <p>Add an extra layer of security. When enabled, we'll email you a 6-digit code to enter every time you sign in.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" [checked]="twoFactorEnabled" [disabled]="loadingSecurity" (change)="toggleTwoFactor($any($event.target).checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <p class="sec-status" *ngIf="!loadingSecurity">
+          {{ twoFactorEnabled ? '✅ Two-factor authentication is ON.' : 'Two-factor authentication is currently OFF.' }}
+        </p>
       </div>
     </div>
   `,
@@ -201,6 +288,19 @@ import { Address, CreateAddress } from '../../core/models/address.models';
     .empty-addr { background: #fff; border-radius: 14px; padding: 2rem; text-align: center; color: #888; }
 
     .referral-section { }
+
+    .security-section { display: flex; flex-direction: column; gap: 1rem; max-width: 640px; }
+    .sec-card { background: #fff; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; }
+    .sec-info h3 { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin-bottom: 0.4rem; }
+    .sec-info p { font-size: 0.85rem; color: #888; line-height: 1.6; }
+    .sec-status { font-size: 0.85rem; color: #555; padding: 0 0.25rem; }
+    .switch { position: relative; display: inline-block; width: 48px; height: 26px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 26px; transition: 0.2s; }
+    .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+    .switch input:checked + .slider { background: #6c63ff; }
+    .switch input:checked + .slider:before { transform: translateX(22px); }
+    .switch input:disabled + .slider { opacity: 0.6; cursor: not-allowed; }
     .ref-hero { background: linear-gradient(135deg,#6c63ff,#a29bfe); border-radius: 20px; padding: 2.5rem; color: #fff; margin-bottom: 2rem; }
     .ref-hero h2 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.75rem; }
     .ref-hero p { opacity: 0.85; line-height: 1.6; }
@@ -211,6 +311,16 @@ import { Address, CreateAddress } from '../../core/models/address.models';
     .btn-copy { background: #6c63ff; color: #fff; border: none; border-radius: 8px; padding: 0.5rem 1.25rem; font-weight: 600; cursor: pointer; transition: background 0.18s; }
     .btn-copy:hover { background: #5a52d5; }
     .share-text { font-size: 0.8rem; color: #888; }
+    .share-link { font-size: 0.82rem; color: #555; flex: 1; overflow-x: auto; white-space: nowrap; }
+    .share-row { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .share-btn { display: inline-flex; align-items: center; gap: 0.4rem; border: none; border-radius: 10px; padding: 0.55rem 1rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: opacity 0.18s, transform 0.18s; }
+    .share-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+    .share-whatsapp { background: #e7f9ee; color: #1e9e56; }
+    .share-twitter { background: #eef4fb; color: #1a1a2e; }
+    .share-facebook { background: #e8f0fe; color: #1877f2; }
+    .share-email { background: #f0edff; color: #6c63ff; }
+    .share-native { background: #f7f8fc; color: #555; border: 1.5px solid #e9ecef; }
+    .apply-code-input { flex: 1; border: none; background: transparent; font-size: 0.95rem; font-weight: 600; color: #1a1a2e; outline: none; }
     .ref-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 2rem; }
     .stat-box { background: #fff; border-radius: 14px; padding: 1.25rem; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
     .stat-num { display: block; font-size: 1.6rem; font-weight: 800; color: #1a1a2e; }
@@ -221,6 +331,14 @@ import { Address, CreateAddress } from '../../core/models/address.models';
     .step { text-align: center; }
     .step-num { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; background: #6c63ff; color: #fff; border-radius: 50%; font-size: 1.1rem; font-weight: 800; margin-bottom: 0.75rem; }
     .step p { font-size: 0.875rem; color: #555; line-height: 1.6; }
+    .loyalty-hero { background: linear-gradient(135deg,#00b894,#00cec9); }
+    .loyalty-row { display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 0; border-bottom: 1px solid #f0f0f0; }
+    .loyalty-row:last-child { border-bottom: none; }
+    .loyalty-reason { display: block; font-size: 0.875rem; color: #1a1a2e; font-weight: 600; }
+    .loyalty-date { display: block; font-size: 0.75rem; color: #888; margin-top: 0.15rem; }
+    .loyalty-points { font-size: 1rem; font-weight: 800; }
+    .loyalty-points.positive { color: #00b894; }
+    .loyalty-points.negative { color: #e17055; }
   `]
 })
 export class ProfileComponent implements OnInit {
@@ -233,12 +351,22 @@ export class ProfileComponent implements OnInit {
   referralCode = '';
   refStats: any = null;
   copied = false;
+  linkCopied = false;
+  canNativeShare = typeof navigator !== 'undefined' && !!(navigator as any).share;
+  applyCodeInput = '';
+  applyingCode = false;
+  loyaltyBalance: LoyaltyBalance | null = null;
+  loyaltyHistory: LoyaltyTransaction[] = [];
+  twoFactorEnabled = false;
+  loadingSecurity = true;
+  securityLoaded = false;
 
   form: CreateAddress = this.emptyForm();
 
   constructor(
     private addressService: AddressService,
     private referralService: ReferralService,
+    private loyaltyService: LoyaltyService,
     private auth: AuthService,
     private toasts: ToastService
   ) {}
@@ -254,6 +382,55 @@ export class ProfileComponent implements OnInit {
     if (this.referralCode) return;
     this.referralService.getMyCode().subscribe(r => this.referralCode = r.code);
     this.referralService.getStats().subscribe(s => this.refStats = s);
+  }
+
+  applyReferralCode() {
+    const code = this.applyCodeInput.trim();
+    if (!code) return;
+    this.applyingCode = true;
+    this.referralService.applyCode(code).subscribe({
+      next: (res: any) => {
+        this.applyingCode = false;
+        this.applyCodeInput = '';
+        this.toasts.success(res?.message || 'Referral code applied!');
+        this.loyaltyBalance = null;
+        this.loadLoyalty();
+      },
+      error: (err) => {
+        this.applyingCode = false;
+        this.toasts.error(err?.error?.message || 'Invalid or already used code.');
+      }
+    });
+  }
+
+  loadLoyalty() {
+    if (this.loyaltyBalance) return;
+    this.loyaltyService.getBalance().subscribe(b => this.loyaltyBalance = b);
+    this.loyaltyService.getHistory().subscribe(h => this.loyaltyHistory = h);
+  }
+
+  loadSecurity() {
+    if (this.securityLoaded) return;
+    this.loadingSecurity = true;
+    this.auth.getTwoFactorStatus().subscribe({
+      next: res => { this.twoFactorEnabled = res.enabled; this.loadingSecurity = false; this.securityLoaded = true; },
+      error: () => this.loadingSecurity = false
+    });
+  }
+
+  toggleTwoFactor(enabled: boolean) {
+    this.loadingSecurity = true;
+    this.auth.setTwoFactor(enabled).subscribe({
+      next: res => {
+        this.twoFactorEnabled = res.enabled;
+        this.loadingSecurity = false;
+        this.toasts.success(enabled ? 'Two-factor authentication enabled.' : 'Two-factor authentication disabled.');
+      },
+      error: () => {
+        this.loadingSecurity = false;
+        this.toasts.error('Failed to update two-factor authentication.');
+      }
+    });
   }
 
   resetForm() { this.form = this.emptyForm(); }
@@ -299,11 +476,48 @@ export class ProfileComponent implements OnInit {
     });
   }
 
+  get shareLink(): string {
+    return this.referralCode ? `${window.location.origin}/auth/register?ref=${this.referralCode}` : '';
+  }
+
+  get shareMessage(): string {
+    return `Hey! Use my referral code ${this.referralCode} on ShopEase and we'll both get ₹100 in loyalty points. Sign up here: ${this.shareLink}`;
+  }
+
   copyCode() {
     navigator.clipboard.writeText(this.referralCode).then(() => {
       this.copied = true;
       setTimeout(() => this.copied = false, 2000);
     });
+  }
+
+  copyLink() {
+    navigator.clipboard.writeText(this.shareLink).then(() => {
+      this.linkCopied = true;
+      setTimeout(() => this.linkCopied = false, 2000);
+    });
+  }
+
+  shareViaWhatsApp() {
+    window.open(`https://wa.me/?text=${encodeURIComponent(this.shareMessage)}`, '_blank');
+  }
+
+  shareViaTwitter() {
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(this.shareMessage)}`, '_blank');
+  }
+
+  shareViaFacebook() {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(this.shareLink)}`, '_blank');
+  }
+
+  shareViaEmail() {
+    const subject = encodeURIComponent('Join me on ShopEase!');
+    const body = encodeURIComponent(this.shareMessage);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  }
+
+  shareNative() {
+    (navigator as any).share?.({ title: 'ShopEase Referral', text: this.shareMessage, url: this.shareLink }).catch(() => {});
   }
 
   private emptyForm(): CreateAddress {

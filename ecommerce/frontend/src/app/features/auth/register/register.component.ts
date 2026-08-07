@@ -1,7 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../core/services/toast.service';
 
@@ -72,6 +72,15 @@ import { ToastService } from '../../../core/services/toast.service';
               <p class="field-err" *ngIf="form.get('password')?.invalid && form.get('password')?.touched">Password must be at least 6 characters.</p>
             </div>
 
+            <div class="field-group">
+              <label for="referralCode">Referral Code <span class="optional-tag">(optional)</span></label>
+              <div class="input-wrap">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                <input id="referralCode" type="text" formControlName="referralCode" placeholder="e.g. RAHU0042" autocomplete="off">
+              </div>
+              <p class="field-hint" *ngIf="form.get('referralCode')?.value">You and your friend will both get ₹100 in loyalty points!</p>
+            </div>
+
             <div *ngIf="error" class="error-banner">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               {{ error }}
@@ -127,6 +136,8 @@ import { ToastService } from '../../../core/services/toast.service';
     .input-wrap.has-error input { border-color: #e17055; }
     .toggle-pw { position: absolute; right: 0.85rem; background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0; line-height: 1; }
     .field-err { font-size: 0.78rem; color: #e17055; margin-top: 0.4rem; }
+    .optional-tag { text-transform: none; font-weight: 400; color: #aaa; letter-spacing: 0; }
+    .field-hint { font-size: 0.78rem; color: #00b894; margin-top: 0.4rem; }
 
     .pw-strength { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
     .bars { display: flex; gap: 3px; }
@@ -167,7 +178,7 @@ import { ToastService } from '../../../core/services/toast.service';
     }
   `]
 })
-export class RegisterComponent {
+export class RegisterComponent implements OnInit {
   form = this.fb.group({
     fullName: ['', Validators.required],
     email: ['', [Validators.required, Validators.email]],
@@ -199,8 +210,14 @@ export class RegisterComponent {
     private fb: FormBuilder,
     private auth: AuthService,
     private router: Router,
+    private route: ActivatedRoute,
     private toasts: ToastService
   ) {}
+
+  ngOnInit() {
+    const ref = this.route.snapshot.queryParamMap.get('ref');
+    if (ref) this.form.patchValue({ referralCode: ref });
+  }
 
   onSubmit() {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }

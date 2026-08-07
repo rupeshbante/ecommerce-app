@@ -9,9 +9,13 @@ public class User
     public string? GoogleId { get; set; }
     public string? Phone { get; set; }
     public string? ReferralCode { get; set; }
+    public int LoyaltyPoints { get; set; } = 0;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? PasswordResetToken { get; set; }
     public DateTime? PasswordResetExpiry { get; set; }
+    public bool TwoFactorEnabled { get; set; } = false;
+    public string? OtpCode { get; set; }
+    public DateTime? OtpExpiry { get; set; }
     public ICollection<Order> Orders { get; set; } = new List<Order>();
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
     public ICollection<WishlistItem> WishlistItems { get; set; } = new List<WishlistItem>();

@@ -33,6 +33,19 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
           </div>
         </div>");
 
+    public Task SendOrderProcessingAsync(string toEmail, string userName, int orderId) =>
+        SendAsync(toEmail, $"Order #{orderId} is being prepared - ShopEase", $@"
+        <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>
+          <div style='background:linear-gradient(135deg,#1a1a2e,#6c63ff);padding:2rem;text-align:center;'>
+            <h1 style='color:#fff;margin:0;'>Your Order is Being Prepared</h1>
+          </div>
+          <div style='padding:2rem;'>
+            <p>Hi <strong>{userName}</strong>,</p>
+            <p>Your order <strong>#{orderId}</strong> is confirmed and is now being packed by our team.</p>
+            <a href='https://shopease.in/orders' style='display:inline-block;background:#6c63ff;color:#fff;text-decoration:none;padding:0.9rem 2rem;border-radius:10px;font-weight:600;margin-top:1rem;'>Track Order</a>
+          </div>
+        </div>");
+
     public Task SendOrderShippedAsync(string toEmail, string userName, int orderId) =>
         SendAsync(toEmail, $"Order #{orderId} Shipped! - ShopEase", $@"
         <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>
@@ -43,6 +56,19 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
             <p>Hi <strong>{userName}</strong>,</p>
             <p>Great news! Your order <strong>#{orderId}</strong> has been shipped and is on its way to you.</p>
             <p style='color:#6c63ff;font-size:1.1rem;font-weight:600;'>Expected delivery: 2-3 business days</p>
+            <a href='https://shopease.in/orders' style='display:inline-block;background:#6c63ff;color:#fff;text-decoration:none;padding:0.9rem 2rem;border-radius:10px;font-weight:600;margin-top:1rem;'>Track Order</a>
+          </div>
+        </div>");
+
+    public Task SendOrderOutForDeliveryAsync(string toEmail, string userName, int orderId) =>
+        SendAsync(toEmail, $"Order #{orderId} is Out for Delivery! - ShopEase", $@"
+        <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>
+          <div style='background:linear-gradient(135deg,#1a1a2e,#6c63ff);padding:2rem;text-align:center;'>
+            <h1 style='color:#fff;margin:0;'>Out for Delivery!</h1>
+          </div>
+          <div style='padding:2rem;'>
+            <p>Hi <strong>{userName}</strong>,</p>
+            <p>Your order <strong>#{orderId}</strong> is out for delivery and will reach you today.</p>
             <a href='https://shopease.in/orders' style='display:inline-block;background:#6c63ff;color:#fff;text-decoration:none;padding:0.9rem 2rem;border-radius:10px;font-weight:600;margin-top:1rem;'>Track Order</a>
           </div>
         </div>");
@@ -58,6 +84,19 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
             <p>Your order <strong>#{orderId}</strong> has been delivered. We hope you love your purchase!</p>
             <p>Please take a moment to rate your experience and help other shoppers.</p>
             <a href='https://shopease.in/orders' style='display:inline-block;background:#00b894;color:#fff;text-decoration:none;padding:0.9rem 2rem;border-radius:10px;font-weight:600;margin-top:1rem;'>Write a Review</a>
+          </div>
+        </div>");
+
+    public Task SendOrderCancelledAsync(string toEmail, string userName, int orderId) =>
+        SendAsync(toEmail, $"Order #{orderId} Cancelled - ShopEase", $@"
+        <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>
+          <div style='background:linear-gradient(135deg,#e17055,#c0392b);padding:2rem;text-align:center;'>
+            <h1 style='color:#fff;margin:0;'>Order Cancelled</h1>
+          </div>
+          <div style='padding:2rem;'>
+            <p>Hi <strong>{userName}</strong>,</p>
+            <p>Your order <strong>#{orderId}</strong> has been cancelled. If you were charged, any payment will be refunded within 5-7 business days.</p>
+            <a href='https://shopease.in/products' style='display:inline-block;background:#6c63ff;color:#fff;text-decoration:none;padding:0.9rem 2rem;border-radius:10px;font-weight:600;margin-top:1rem;'>Continue Shopping</a>
           </div>
         </div>");
 
@@ -130,6 +169,26 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
             <div style='text-align:center;margin:2rem 0;'>
               <a href='https://shopease-rupesh.vercel.app/products/{productId}' style='display:inline-block;background:#00b894;color:#fff;text-decoration:none;padding:1rem 2.5rem;border-radius:12px;font-weight:700;font-size:1rem;'>Shop Now</a>
             </div>
+          </div>
+          <div style='background:#f7f8fc;padding:1rem 2rem;text-align:center;font-size:0.8rem;color:#888;'>
+            ShopEase Pvt. Ltd. | support@shopease.in
+          </div>
+        </div>");
+
+    public Task SendOtpAsync(string toEmail, string userName, string code) =>
+        SendAsync(toEmail, $"Your ShopEase login code: {code}", $@"
+        <div style='font-family:Inter,sans-serif;max-width:600px;margin:0 auto;background:#fff;'>
+          <div style='background:linear-gradient(135deg,#1a1a2e,#6c63ff);padding:2rem;text-align:center;'>
+            <h1 style='color:#fff;margin:0;'>Your Login Code</h1>
+            <p style='color:rgba(255,255,255,0.8);margin:0.5rem 0 0;'>ShopEase Account Security</p>
+          </div>
+          <div style='padding:2rem;'>
+            <p>Hi <strong>{userName}</strong>,</p>
+            <p style='color:#555;'>Use this code to complete your sign-in:</p>
+            <div style='text-align:center;margin:2rem 0;'>
+              <span style='display:inline-block;background:#f5f3ff;color:#6c63ff;letter-spacing:6px;font-size:1.8rem;font-weight:800;padding:1rem 1.5rem;border-radius:12px;'>{code}</span>
+            </div>
+            <p style='color:#888;font-size:0.85rem;'>This code expires in <strong>5 minutes</strong>. If you didn't try to sign in, you can safely ignore this email.</p>
           </div>
           <div style='background:#f7f8fc;padding:1rem 2rem;text-align:center;font-size:0.8rem;color:#888;'>
             ShopEase Pvt. Ltd. | support@shopease.in

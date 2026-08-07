@@ -9,8 +9,10 @@ import { ReviewService } from '../../../core/services/review.service';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { RecentlyViewedService } from '../../../core/services/recently-viewed.service';
+import { ProductQAService } from '../../../core/services/product-qa.service';
 import { Product, ProductVariant } from '../../../core/models/product.models';
 import { Review, RatingSummary } from '../../../core/models/review.models';
+import { ProductQuestion } from '../../../core/models/product-qa.models';
 
 @Component({
   selector: 'app-product-detail',
@@ -238,6 +240,62 @@ import { Review, RatingSummary } from '../../../core/models/review.models';
             </div>
           </div>
         </div>
+
+        <!-- Q&A Section -->
+        <div class="qa-section">
+          <div class="qa-card">
+            <h3>Questions & Answers</h3>
+
+            <div class="ask-question" *ngIf="auth.isLoggedIn() && !showQuestionForm">
+              <button class="btn-write-review" (click)="showQuestionForm = true">Ask a Question</button>
+            </div>
+            <p class="qa-login-hint" *ngIf="!auth.isLoggedIn()">Please <a routerLink="/auth/login">log in</a> to ask a question.</p>
+
+            <div class="qa-form" *ngIf="showQuestionForm">
+              <textarea [(ngModel)]="newQuestion" rows="3" placeholder="What would you like to know about this product?" class="rev-textarea"></textarea>
+              <div class="rev-form-actions">
+                <button class="btn-submit-rev" (click)="submitQuestion()" [disabled]="submittingQuestion">
+                  {{ submittingQuestion ? 'Submitting...' : 'Submit Question' }}
+                </button>
+                <button class="btn-cancel-rev" (click)="showQuestionForm = false">Cancel</button>
+              </div>
+            </div>
+
+            <div class="qa-list">
+              <div *ngIf="qaLoading" class="rev-loading">Loading questions...</div>
+              <div *ngIf="!qaLoading && questions.length === 0" class="no-reviews">
+                <p>No questions yet. Ask the first one!</p>
+              </div>
+              <div class="qa-item" *ngFor="let q of questions">
+                <div class="qa-question-row">
+                  <span class="qa-q-icon">Q</span>
+                  <div class="qa-q-body">
+                    <p class="qa-q-text">{{ q.question }}</p>
+                    <span class="qa-meta">{{ q.askerName }} · {{ q.createdAt | date:'dd MMM yyyy' }}</span>
+                  </div>
+                </div>
+
+                <div class="qa-answer-row" *ngFor="let a of q.answers">
+                  <span class="qa-a-icon">A</span>
+                  <div class="qa-q-body">
+                    <p class="qa-q-text">{{ a.answer }}</p>
+                    <span class="qa-meta">{{ a.answererName }} (Store) · {{ a.createdAt | date:'dd MMM yyyy' }}</span>
+                  </div>
+                </div>
+
+                <p class="qa-unanswered" *ngIf="q.answers.length === 0">Awaiting answer from the store.</p>
+
+                <!-- Admin/Manager reply -->
+                <div class="qa-reply-box" *ngIf="auth.isAdminOrManager()">
+                  <input [(ngModel)]="replyDrafts[q.id]" placeholder="Write an official answer..." class="rev-input">
+                  <button class="btn-submit-rev" (click)="submitAnswer(q)" [disabled]="answering === q.id">
+                    {{ answering === q.id ? 'Posting...' : 'Post Answer' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -365,6 +423,28 @@ import { Review, RatingSummary } from '../../../core/models/review.models';
     .rev-title { font-size: 0.9rem; font-weight: 700; color: #1a1a2e; margin-bottom: 0.35rem; }
     .rev-comment { font-size: 0.875rem; color: #555; line-height: 1.6; }
 
+    /* Q&A Section */
+    .qa-section { margin-top: 2rem; }
+    .qa-card { background: var(--bg-surface); border-radius: 20px; padding: 2rem; box-shadow: 0 2px 16px var(--shadow-sm); }
+    .qa-card h3 { font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1.5rem; }
+    .qa-login-hint { font-size: 0.85rem; color: #888; margin-bottom: 1rem; }
+    .qa-login-hint a { color: #6c63ff; font-weight: 600; text-decoration: none; }
+    .ask-question { margin-bottom: 1.5rem; }
+    .qa-form { background: var(--bg-surface2); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    .qa-list { display: flex; flex-direction: column; gap: 1.25rem; }
+    .qa-item { padding: 1.25rem; background: var(--bg-surface2); border-radius: 14px; }
+    .qa-question-row, .qa-answer-row { display: flex; align-items: flex-start; gap: 0.75rem; }
+    .qa-answer-row { margin-top: 0.75rem; margin-left: 1.5rem; }
+    .qa-q-icon, .qa-a-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem; flex-shrink: 0; }
+    .qa-q-icon { background: #6c63ff; color: #fff; }
+    .qa-a-icon { background: #00b894; color: #fff; }
+    .qa-q-body { flex: 1; }
+    .qa-q-text { font-size: 0.9rem; color: #333; margin-bottom: 0.25rem; }
+    .qa-meta { font-size: 0.75rem; color: #aaa; }
+    .qa-unanswered { font-size: 0.8rem; color: #aaa; font-style: italic; margin: 0.5rem 0 0 2.5rem; }
+    .qa-reply-box { display: flex; gap: 0.6rem; margin-top: 1rem; margin-left: 1.5rem; }
+    .qa-reply-box .rev-input { margin-bottom: 0; flex: 1; }
+
     .not-found { text-align: center; padding: 7rem 2rem; }
     .nf-icon { font-size: 4rem; margin-bottom: 1rem; }
     .not-found h2 { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; margin-bottom: 0.5rem; }
@@ -430,6 +510,14 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
   saleCountdown = '';
   private countdownInterval: any;
 
+  questions: ProductQuestion[] = [];
+  qaLoading = true;
+  showQuestionForm = false;
+  newQuestion = '';
+  submittingQuestion = false;
+  replyDrafts: Record<number, string> = {};
+  answering: number | null = null;
+
   constructor(
     private route: ActivatedRoute,
     private productService: ProductService,
@@ -438,7 +526,8 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
     private reviewService: ReviewService,
     private wishlistService: WishlistService,
     public auth: AuthService,
-    private recentlyViewedService: RecentlyViewedService
+    private recentlyViewedService: RecentlyViewedService,
+    private qaService: ProductQAService
   ) {}
 
   get effectivePrice(): number {
@@ -463,6 +552,7 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
             this.buildVariantGroups(p.variants || []);
             this.loading = false;
             this.loadReviews(id);
+            this.loadQuestions(id);
             if (this.auth.isLoggedIn()) this.checkWishlist(id);
             this.recentlyViewedService.add(p);
             if (p.salePrice && p.saleEndsAt) this.startCountdown(p.saleEndsAt);
@@ -559,6 +649,44 @@ export class ProductDetailComponent implements OnInit, OnDestroy {
         this.reviewService.getRatingSummary(this.product!.id).subscribe(s => this.ratingSummary = s);
       },
       error: () => { this.submittingReview = false; this.toasts.error('Failed to submit review'); }
+    });
+  }
+
+  loadQuestions(productId: number) {
+    this.qaLoading = true;
+    this.qaService.getForProduct(productId).subscribe({
+      next: q => { this.questions = q; this.qaLoading = false; },
+      error: () => { this.qaLoading = false; }
+    });
+  }
+
+  submitQuestion() {
+    if (!this.newQuestion.trim() || !this.product) return;
+    this.submittingQuestion = true;
+    this.qaService.ask(this.product.id, this.newQuestion.trim()).subscribe({
+      next: q => {
+        this.questions.unshift(q);
+        this.newQuestion = '';
+        this.showQuestionForm = false;
+        this.submittingQuestion = false;
+        this.toasts.success('Question submitted!');
+      },
+      error: () => { this.submittingQuestion = false; this.toasts.error('Failed to submit question'); }
+    });
+  }
+
+  submitAnswer(q: ProductQuestion) {
+    const answer = (this.replyDrafts[q.id] || '').trim();
+    if (!answer) return;
+    this.answering = q.id;
+    this.qaService.answer(q.id, answer).subscribe({
+      next: updated => {
+        this.questions = this.questions.map(x => x.id === updated.id ? updated : x);
+        this.replyDrafts[q.id] = '';
+        this.answering = null;
+        this.toasts.success('Answer posted!');
+      },
+      error: () => { this.answering = null; this.toasts.error('Failed to post answer'); }
     });
   }
 
